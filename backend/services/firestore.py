@@ -1,0 +1,202 @@
+from firebase.config import get_firestore
+from datetime import datetime, timezone
+
+
+# ─── Collections ─────────────────────────────────────────────
+USERS       = "users"
+CATEGORIES  = "categories"
+MENU_ITEMS  = "menu_items"
+ORDERS      = "orders"
+
+
+def now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+# ─── Generic Helpers ─────────────────────────────────────────
+def doc_to_dict(doc) -> dict:
+    """Convert a Firestore document snapshot to a plain dict with its ID."""
+    if not doc.exists:
+        return None
+    data = doc.to_dict()
+    data["id"] = doc.id
+    return data
+
+
+def collection_to_list(query) -> list:
+    """Convert a Firestore query result to a list of dicts."""
+    return [doc_to_dict(doc) for doc in query.stream()]
+
+
+# ─── Users ───────────────────────────────────────────────────
+def create_user(uid: str, data: dict) -> dict:
+    db = get_firestore()
+    data["created_at"] = now()
+    db.collection(USERS).document(uid).set(data)
+    data["id"] = uid
+    return data
+
+
+def get_user(uid: str) -> dict:
+    db = get_firestore()
+    return doc_to_dict(db.collection(USERS).document(uid).get())
+
+
+def update_user(uid: str, data: dict) -> dict:
+    db = get_firestore()
+    data = {k: v for k, v in data.items() if v is not None}
+    db.collection(USERS).document(uid).update(data)
+    return get_user(uid)
+
+
+# ─── Categories ──────────────────────────────────────────────
+def create_category(data: dict) -> dict:
+    db = get_firestore()
+    ref = db.collection(CATEGORIES).document()
+    ref.set(data)
+    data["id"] = ref.id
+    return data
+
+
+def get_all_categories() -> list:
+    db = get_firestore()
+    query = db.collection(CATEGORIES).order_by("sort_order")
+    return collection_to_list(query)
+
+
+def get_category(category_id: str) -> dict:
+    db = get_firestore()
+    return doc_to_dict(db.collection(CATEGORIES).document(category_id).get())
+
+
+def update_category(category_id: str, data: dict) -> dict:
+    db = get_firestore()
+    data = {k: v for k, v in data.items() if v is not None}
+    db.collection(CATEGORIES).document(category_id).update(data)
+    return get_category(category_id)
+
+
+def delete_category(category_id: str):
+    db = get_firestore()
+    db.collection(CATEGORIES).document(category_id).delete()
+
+
+# ─── Menu Items ──────────────────────────────────────────────
+def create_menu_item(data: dict) -> dict:
+    db = get_firestore()
+    # Convert options (list of Pydantic models) to plain dicts
+    if "options" in data:
+        data["options"] = [
+            o.model_dump() if hasattr(o, "model_dump") else o
+            for o in data["options"]
+        ]
+    ref = db.collection(MENU_ITEMS).document()
+    ref.set(data)
+    data["id"] = ref.id
+    return data
+
+
+def get_all_menu_items(available_only: bool = False) -> list:
+    db = get_firestore()
+    query = db.collection(MENU_ITEMS)
+    if available_only:
+        query = query.where("available", "==", True)
+    return collection_to_list(query)
+
+
+def get_menu_items_by_category(category_id: str, available_only: bool = False) -> list:
+    db = get_firestore()
+    query = db.collection(MENU_ITEMS).where("category_id", "==", category_id)
+    if available_only:
+        query = query.where("available", "==", True)
+    return collection_to_list(query)
+
+
+def get_menu_item(item_id: str) -> dict:
+    db = get_firestore()
+    return doc_to_dict(db.collection(MENU_ITEMS).document(item_id).get())
+
+
+def update_menu_item(item_id: str, data: dict) -> dict:
+    db = get_firestore()
+    data = {k: v for k, v in data.items() if v is not None}
+    if "options" in data:
+        data["options"] = [
+            o.model_dump() if hasattr(o, "model_dump") else o
+            for o in data["options"]
+        ]
+    db.collection(MENU_ITEMS).document(item_id).update(data)
+    return get_menu_item(item_id)
+
+
+def delete_menu_item(item_id: str):
+    db = get_firestore()
+    db.collection(MENU_ITEMS).document(item_id).delete()
+
+
+# ─── Orders ──────────────────────────────────────────────────
+def create_order(data: dict) -> dict:
+    db = get_firestore()
+    data["status"]     = "received"
+    data["created_at"] = now()
+    data["updated_at"] = now()
+
+    # Calculate total price
+    data["total_price"] = sum(
+        item["price"] * item["quantity"]
+        for item in data.get("items", [])
+    )
+
+    # Serialize items
+    data["items"] = [
+        i.model_dump() if hasattr(i, "model_dump") else i
+        for i in data.get("items", [])
+    ]
+
+    ref = db.collection(ORDERS).document()
+    ref.set(data)
+    data["id"] = ref.id
+    return data
+
+
+def get_all_orders(status: str = None) -> list:
+    db = get_firestore()
+    query = db.collection(ORDERS).order_by("created_at")
+    if status:
+        query = query.where("status", "==", status)
+    return collection_to_list(query)
+
+
+def get_active_orders() -> list:
+    """Orders the employee needs to action (received + in_progress)."""
+    db = get_firestore()
+    results = []
+    for status in ["received", "in_progress"]:
+        docs = db.collection(ORDERS).where("status", "==", status).stream()
+        results.extend([doc_to_dict(d) for d in docs])
+    results.sort(key=lambda x: x.get("created_at", ""))
+    return results
+
+
+def get_customer_orders(customer_id: str) -> list:
+    db = get_firestore()
+    query = (
+        db.collection(ORDERS)
+        .where("customer_id", "==", customer_id)
+        .order_by("created_at")
+    )
+    return collection_to_list(query)
+
+
+def get_order(order_id: str) -> dict:
+    db = get_firestore()
+    return doc_to_dict(db.collection(ORDERS).document(order_id).get())
+
+
+def update_order_status(order_id: str, status: str) -> dict:
+    db = get_firestore()
+    db.collection(ORDERS).document(order_id).update({
+        "status":     status,
+        "updated_at": now(),
+    })
+    return get_order(order_id)

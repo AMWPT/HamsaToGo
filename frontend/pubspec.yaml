@@ -1,0 +1,57 @@
+name: hamsa_flutter
+description: Hamsa To Go — Coffee Ordering App
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.3.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_localizations:
+    sdk: flutter
+
+  # State management
+  flutter_riverpod: ^2.5.1
+
+  # Navigation
+  go_router: ^14.2.0
+
+  # Fonts & styling
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.0
+
+  # Network
+  dio: ^5.4.3+1
+
+  # Storage
+  shared_preferences: ^2.3.0
+  flutter_secure_storage: ^9.2.2
+
+  # Images
+  cached_network_image: ^3.3.1
+
+  # Utilities
+  intl: 0.20.2
+  shimmer: ^3.0.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+
+  fonts:
+    - family: Peignot
+      fonts:
+        - asset: assets/fonts/PeignotDemi.otf
+          weight: 600
+    - family: Noor
+      fonts:
+        - asset: assets/fonts/NoorRegular.ttf
+          weight: 400
