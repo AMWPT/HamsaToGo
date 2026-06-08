@@ -115,17 +115,20 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       if (!mounted) return;
       final error = ref.read(authProvider).error;
-      if (error == 'NO_ACCOUNT') {
-        // Phone not registered — send to register
+      if (error != null) {
         setState(() => _verifying = false);
-        _showError(
-          'No account found. Please register first.',
-          action: SnackBarAction(
-            label: 'Register',
-            textColor: HamsaColors.bgDeep,
-            onPressed: () => context.go(AppRoutes.register),
-          ),
-        );
+        if (error == 'NO_ACCOUNT') {
+          _showError(
+            'No account found. Please register first.',
+            action: SnackBarAction(
+              label: 'Register',
+              textColor: HamsaColors.bgDeep,
+              onPressed: () => context.go(AppRoutes.register),
+            ),
+          );
+        } else {
+          _showError('Could not connect to server. Please try again.');
+        }
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _verifying = false);
