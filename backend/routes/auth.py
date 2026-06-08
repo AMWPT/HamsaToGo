@@ -1,142 +1,87 @@
 import os
-import requests as http_requests
 from fastapi import APIRouter, HTTPException, status
 from firebase_admin import auth as firebase_auth
-from models.user import UserCreate, UserLogin, UserUpdate, UserResponse, AdminLogin
+from models.user import PhoneVerifyRequest, UserUpdate, UserResponse, AdminLogin
 from services import firestore as db
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
-FIREBASE_SIGN_IN_URL = (
-    "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword"
-)
 
-
-def _firebase_sign_in(email: str, password: str) -> dict:
-    """Call Firebase REST API to verify credentials and get an ID token."""
-    api_key = os.getenv("FIREBASE_WEB_API_KEY", "")
-    resp = http_requests.post(
-        FIREBASE_SIGN_IN_URL,
-        params={"key": api_key},
-        json={"email": email, "password": password, "returnSecureToken": True},
-        timeout=10,
-    )
-    if resp.status_code != 200:
-        error_msg = resp.json().get("error", {}).get("message", "LOGIN_FAILED")
-        if "EMAIL_NOT_FOUND" in error_msg or "INVALID_LOGIN_CREDENTIALS" in error_msg:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect email or password.",
-            )
-        if "INVALID_PASSWORD" in error_msg:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Incorrect password.",
-            )
-        if "TOO_MANY_ATTEMPTS" in error_msg:
-            raise HTTPException(
-                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many failed attempts. Try again later.",
-            )
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=error_msg,
-        )
-    return resp.json()   # contains idToken, localId, email, ...
-
-
-# ─── Customer Register ────────────────────────────────────────
-@router.post("/register", status_code=status.HTTP_201_CREATED)
-def register(user: UserCreate):
+# ─── Phone OTP Verify (Sign In + Register) ───────────────────
+@router.post("/phone-verify")
+def phone_verify(data: PhoneVerifyRequest):
     """
-    Register a new customer account.
-    Creates a Firebase Auth user + Firestore document.
-    Returns {user, token}.
+    Called after Firebase phone OTP is verified on the client.
+    - Verifies the Firebase ID token server-side.
+    - If the user exists in Firestore → signs them in (returns user + token).
+    - If not and full_name is provided → creates new account.
+    - If not and full_name is missing → returns 404 so the app redirects to register.
     """
+    # Verify the Firebase ID token
     try:
-        firebase_user = firebase_auth.create_user(
-            email=user.email,
-            password=user.password,
-            display_name=user.full_name,
-        )
-    except firebase_auth.EmailAlreadyExistsError:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="An account with this email already exists.",
-        )
+        decoded = firebase_auth.verify_id_token(data.id_token)
     except Exception as e:
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(e),
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {str(e)}",
         )
 
-    # Save to Firestore
-    user_data = db.create_user(firebase_user.uid, {
-        "email":     user.email,
-        "full_name": user.full_name,
-        "fcm_token": None,
-    })
+    uid = decoded["uid"]
+    phone = decoded.get("phone_number", "")
 
-    # Sign in immediately to get an ID token
-    try:
-        sign_in = _firebase_sign_in(user.email, user.password)
-        token = sign_in.get("idToken")
-    except Exception:
-        token = None
-
-    return {"user": user_data, "token": token}
-
-
-# ─── Customer Login ───────────────────────────────────────────
-@router.post("/login")
-def login(credentials: UserLogin):
-    """
-    Log in a customer with email + password.
-    Verifies with Firebase Auth and returns {user, token}.
-    """
-    sign_in = _firebase_sign_in(credentials.email, credentials.password)
-    uid   = sign_in["localId"]
-    token = sign_in["idToken"]
-
-    # Fetch or lazily create Firestore profile
+    # Check Firestore
     user_data = db.get_user(uid)
+
     if not user_data:
-        # Account exists in Firebase Auth but not in Firestore (edge case)
+        # New user — full_name required
+        if not data.full_name or not data.full_name.strip():
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="NO_ACCOUNT",
+            )
         user_data = db.create_user(uid, {
-            "email":     credentials.email,
-            "full_name": credentials.email.split("@")[0],
+            "phone": phone,
+            "full_name": data.full_name.strip(),
             "fcm_token": None,
         })
 
-    return {"user": user_data, "token": token}
+    return {"user": user_data, "token": data.id_token}
 
 
-# ─── Update FCM Token / Profile ───────────────────────────────
-@router.patch("/users/{user_id}", response_model=UserResponse)
+# ─── Get User Profile ─────────────────────────────────────────
+@router.get("/users/{user_id}")
+def get_user(user_id: str):
+    user = db.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+    return {
+        "id": user["id"],
+        "phone": user.get("phone", ""),
+        "full_name": user.get("full_name", ""),
+        "fcm_token": user.get("fcm_token"),
+        "created_at": str(user["created_at"]) if user.get("created_at") else None,
+    }
+
+
+# ─── Update User (FCM token / full name) ─────────────────────
+@router.patch("/users/{user_id}")
 def update_user(user_id: str, update: UserUpdate):
     user = db.get_user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
     updated = db.update_user(user_id, update.model_dump(exclude_none=True))
-    return UserResponse(**updated)
+    return {
+        "id": updated["id"],
+        "phone": updated.get("phone", ""),
+        "full_name": updated.get("full_name", ""),
+        "fcm_token": updated.get("fcm_token"),
+    }
 
 
-# ─── Get Customer Profile ─────────────────────────────────────
-@router.get("/users/{user_id}", response_model=UserResponse)
-def get_user(user_id: str):
-    user = db.get_user(user_id)
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found.")
-    return UserResponse(**user)
-
-
-# ─── Admin Login Check ────────────────────────────────────────
+# ─── Admin Login ──────────────────────────────────────────────
 @router.post("/admin/verify")
 def verify_admin(credentials: AdminLogin):
-    """
-    Verify fixed admin credentials (single shared device).
-    Returns {success: true} on match.
-    """
+    """Fixed admin credentials check (single shared device)."""
     admin_email    = os.getenv("ADMIN_EMAIL", "admin@hamsa.com")
     admin_password = os.getenv("ADMIN_PASSWORD", "")
 
@@ -145,5 +90,4 @@ def verify_admin(credentials: AdminLogin):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid admin credentials.",
         )
-
-    return {"success": True, "message": "Admin verified."}
+    return {"success": True}

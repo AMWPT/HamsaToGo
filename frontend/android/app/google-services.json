@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "269284588239",
+    "project_id": "hamsacafe-1",
+    "storage_bucket": "hamsacafe-1.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:269284588239:android:8fa62ab7b09dc9b1ec15ba",
+        "android_client_info": {
+          "package_name": "com.hamsa.hamsa_flutter"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBg1oohnZswS7o3k_B-681uhTC83V-0fSU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

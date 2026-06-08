@@ -46,14 +46,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _tryRestoreSession() async {
     try {
-      final userId = await _storage.read(key: StorageKeys.userId);
       final isAdmin = await _storage.read(key: StorageKeys.isAdmin);
-
       if (isAdmin == 'true') {
         state = const AuthState(isAdmin: true);
         return;
       }
 
+      final userId = await _storage.read(key: StorageKeys.userId);
       if (userId != null) {
         final user = await _api.getUser(userId);
         state = AuthState(user: user);
@@ -63,40 +62,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState();
   }
 
-  Future<void> register({
-    required String email,
-    required String password,
-    required String fullName,
+  /// Called after Firebase phone OTP is verified on device.
+  /// [idToken] = Firebase ID token.
+  /// [fullName] = provided only on the register screen (new users).
+  Future<void> completePhoneAuth({
+    required String idToken,
+    String? fullName,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
-      final data = await _api.register(
-        email: email,
-        password: password,
+      final data = await _api.phoneVerify(
+        idToken: idToken,
         fullName: fullName,
       );
-      final user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
-      final token = data['token'] as String?;
-
-      await _storage.write(key: StorageKeys.userId, value: user.id);
-      await _storage.write(key: StorageKeys.userEmail, value: user.email);
-      if (token != null) {
-        await _storage.write(key: StorageKeys.authToken, value: token);
-      }
-
-      state = AuthState(user: user);
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: e.toString());
-    }
-  }
-
-  Future<void> login({
-    required String email,
-    required String password,
-  }) async {
-    state = state.copyWith(isLoading: true, error: null);
-    try {
-      final data = await _api.login(email: email, password: password);
       final user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
       final token = data['token'] as String?;
 
@@ -135,8 +113,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   String _parseError(dynamic e) {
-    if (e is Exception) return e.toString().replaceAll('Exception: ', '');
-    return 'Something went wrong. Please try again.';
+    final msg = e.toString();
+    if (msg.contains('NO_ACCOUNT')) return 'NO_ACCOUNT';
+    return msg.replaceAll('Exception: ', '');
   }
 }
 

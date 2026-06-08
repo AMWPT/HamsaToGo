@@ -1,37 +1,30 @@
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
 
 
-class UserCreate(BaseModel):
-    """Used when a customer registers."""
-    email: EmailStr
-    password: str
-    full_name: str
+class PhoneVerifyRequest(BaseModel):
+    """Sent after Firebase phone OTP verification."""
+    id_token: str           # Firebase ID token from client
+    full_name: Optional[str] = None   # Required only for new users (register)
 
 
 class UserUpdate(BaseModel):
-    """Used to update a customer's FCM token."""
+    """Update a customer's profile or FCM token."""
     fcm_token: Optional[str] = None
     full_name: Optional[str] = None
 
 
 class UserResponse(BaseModel):
-    """Returned to the client after register/login."""
+    """Returned to the client."""
     id: str
-    email: str
+    phone: Optional[str] = None
     full_name: str
     fcm_token: Optional[str] = None
     created_at: Optional[datetime] = None
 
 
-class UserLogin(BaseModel):
-    """Used when a customer logs in."""
-    email: EmailStr
-    password: str
-
-
 class AdminLogin(BaseModel):
-    """Fixed admin login (single device)."""
+    """Fixed admin login (single shared device)."""
     email: str
     password: str

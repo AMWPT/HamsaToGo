@@ -34,27 +34,15 @@ class ApiService {
 
   // ─── Auth ──────────────────────────────────────────────────
 
-  Future<Map<String, dynamic>> register({
-    required String email,
-    required String password,
-    required String fullName,
+  /// Called after Firebase phone OTP verification.
+  /// [fullName] is required only for new users (register flow).
+  Future<Map<String, dynamic>> phoneVerify({
+    required String idToken,
+    String? fullName,
   }) async {
-    final res = await _dio.post('/auth/register', data: {
-      'email': email,
-      'password': password,
-      'full_name': fullName,
-    });
-    return res.data as Map<String, dynamic>;
-  }
-
-  Future<Map<String, dynamic>> login({
-    required String email,
-    required String password,
-  }) async {
-    // Firebase Auth login — get ID token
-    final res = await _dio.post('/auth/login', data: {
-      'email': email,
-      'password': password,
+    final res = await _dio.post('/auth/phone-verify', data: {
+      'id_token': idToken,
+      if (fullName != null) 'full_name': fullName,
     });
     return res.data as Map<String, dynamic>;
   }
