@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/auth_provider.dart';
@@ -34,12 +34,20 @@ abstract class AppRoutes {
   static const history = '/admin/history';
 }
 
+class _AuthRouterNotifier extends ChangeNotifier {
+  _AuthRouterNotifier(Ref ref) {
+    ref.listen<AuthState>(authProvider, (_, __) => notifyListeners());
+  }
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authProvider);
+  final listenable = _AuthRouterNotifier(ref);
 
   return GoRouter(
     initialLocation: AppRoutes.splash,
+    refreshListenable: listenable,
     redirect: (context, state) {
+      final authState = ref.read(authProvider);
       final isLoading = authState.isLoading;
       if (isLoading) return null; // let splash handle it
 
@@ -56,6 +64,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       } else if (authState.user != null) {
         if (isAuth || isSplash || isLanguage || isAdminLogin) {
           return AppRoutes.home;
+        }
+      } else {
+        // Not authenticated: kick out of any protected route back to login.
+        final isPublic = isSplash || isLanguage || isAuth || isAdminLogin;
+        if (!isPublic) {
+          return AppRoutes.login;
         }
       }
       return null;

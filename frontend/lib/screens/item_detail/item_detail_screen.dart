@@ -27,7 +27,17 @@ class ItemDetailScreen extends ConsumerStatefulWidget {
 class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
   int _quantity = 1;
   final Map<String, String> _selectedOptions = {};
+  Crop? _selectedCrop;
   String? _notes;
+
+  /// Stable key used to carry the chosen crop through cart → order.
+  static const _cropKey = 'Crop';
+
+  /// Fetch the item once. Creating the future inside build() would re-run
+  /// the request on every setState (e.g. picking a crop), flashing the
+  /// loading spinner and resetting the screen.
+  late final Future<MenuItem> _itemFuture =
+      ref.read(apiServiceProvider).getMenuItem(widget.itemId);
 
   /// Total price modifier from selected options (e.g. +5 for coconut milk)
   double _calcModifier(MenuItem item) {
@@ -41,15 +51,54 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
     return extra;
   }
 
+  void _showRequiredError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: HamsaText.body(size: 14, color: HamsaColors.bgDeep),
+        ),
+        backgroundColor: HamsaColors.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _addToCart(MenuItem item, String locale) {
+    final isAr = locale == 'ar';
+
+    // Crop is required whenever the item has crops configured.
+    if (item.crops.isNotEmpty && _selectedCrop == null) {
+      _showRequiredError(
+          isAr ? 'الرجاء اختيار المحصول' : 'Please choose a coffee crop');
+      return;
+    }
+
+    // Every option (Milk, Size, etc.) must be chosen before ordering.
+    for (final opt in item.options) {
+      final chosen = _selectedOptions[opt.name];
+      if (chosen == null || chosen.isEmpty) {
+        _showRequiredError(isAr
+            ? 'الرجاء اختيار: ${opt.name}'
+            : 'Please choose: ${opt.name}');
+        return;
+      }
+    }
+
     final modifier = _calcModifier(item);
+    final options = Map<String, String>.from(_selectedOptions);
+    if (_selectedCrop != null) {
+      options[_cropKey] = _selectedCrop!.name(locale);
+    }
     final cartItem = CartItem(
       menuItemId: item.id,
       nameEn: item.nameEn,
       nameAr: item.nameAr,
       unitPrice: item.price + modifier,
       quantity: _quantity,
-      selectedOptions: Map.from(_selectedOptions),
+      selectedOptions: options,
       notes: _notes?.isNotEmpty == true ? _notes : null,
     );
     ref.read(cartProvider.notifier).addItem(cartItem);
@@ -73,12 +122,11 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
   Widget build(BuildContext context) {
     final locale = ref.watch(localeProvider).languageCode;
     final isAr = locale == 'ar';
-    final api = ref.watch(apiServiceProvider);
 
     return Scaffold(
       backgroundColor: HamsaColors.bgDeep,
       body: FutureBuilder(
-        future: api.getMenuItem(widget.itemId),
+        future: _itemFuture,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -174,6 +222,19 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                           .fadeIn(duration: 400.ms)
                           .slideY(begin: 0.2, end: 0),
 
+                      // Coffee crop — required selection when crops exist
+                      if (item.crops.isNotEmpty) ...[
+                        const SizedBox(height: 28),
+                        _CropSelector(
+                          crops: item.crops,
+                          selected: _selectedCrop,
+                          isAr: isAr,
+                          locale: locale,
+                          onSelect: (c) =>
+                              setState(() => _selectedCrop = c),
+                        ).animate(delay: 80.ms).fadeIn(duration: 400.ms),
+                      ],
+
                       const SizedBox(height: 32),
 
                       // Options
@@ -243,6 +304,104 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
   }
 }
 
+// ─── Crop Selector (required) ────────────────────────────────
+class _CropSelector extends StatelessWidget {
+  final List<Crop> crops;
+  final Crop? selected;
+  final bool isAr;
+  final String locale;
+  final void Function(Crop) onSelect;
+
+  const _CropSelector({
+    required this.crops,
+    required this.selected,
+    required this.isAr,
+    required this.locale,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment:
+          isAr ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+      children: [
+        Row(
+          textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.local_cafe_outlined,
+                color: HamsaColors.greenAccent, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              isAr ? 'المحصول' : 'Coffee Crop',
+              style: HamsaText.body(
+                size: 15,
+                weight: FontWeight.w600,
+                color: HamsaColors.muted,
+                letterSpacing: 0.8,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              isAr ? '(مطلوب)' : '(required)',
+              style: HamsaText.body(size: 12, color: HamsaColors.error),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+          children: crops.map((crop) {
+            final isSelected = selected == crop;
+            return GestureDetector(
+              onTap: () => onSelect(crop),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 180),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? HamsaColors.greenAccent.withValues(alpha: 0.15)
+                      : HamsaColors.bgElevated,
+                  borderRadius: BorderRadius.circular(100),
+                  border: Border.all(
+                    color: isSelected
+                        ? HamsaColors.greenAccent
+                        : HamsaColors.border,
+                    width: isSelected ? 1.5 : 1,
+                  ),
+                ),
+                child: Text(
+                  crop.name(locale),
+                  style: isAr
+                      ? HamsaText.arabic(
+                          size: 15,
+                          color: isSelected
+                              ? HamsaColors.greenAccent
+                              : HamsaColors.offWhite,
+                        )
+                      : HamsaText.body(
+                          size: 15,
+                          color: isSelected
+                              ? HamsaColors.greenAccent
+                              : HamsaColors.offWhite,
+                          weight: isSelected
+                              ? FontWeight.w600
+                              : FontWeight.w400,
+                        ),
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
 // ─── Option Group ─────────────────────────────────────────────
 class _OptionGroup extends StatelessWidget {
   final MenuOption option;
@@ -265,14 +424,25 @@ class _OptionGroup extends StatelessWidget {
         crossAxisAlignment:
             isAr ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          Text(
-            option.name,
-            style: HamsaText.body(
-              size: 15,
-              weight: FontWeight.w600,
-              color: HamsaColors.muted,
-              letterSpacing: 0.8,
-            ),
+          Row(
+            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                option.name,
+                style: HamsaText.body(
+                  size: 15,
+                  weight: FontWeight.w600,
+                  color: HamsaColors.muted,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                isAr ? '(مطلوب)' : '(required)',
+                style: HamsaText.body(size: 12, color: HamsaColors.error),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -281,7 +451,6 @@ class _OptionGroup extends StatelessWidget {
             textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
             children: option.choices.map((choice) {
               final isSelected = selected == choice;
-              final modifier = option.priceModifiers[choice] ?? 0;
               return GestureDetector(
                 onTap: () => onSelect(choice),
                 child: AnimatedContainer(
@@ -290,7 +459,7 @@ class _OptionGroup extends StatelessWidget {
                       horizontal: 20, vertical: 12),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? HamsaColors.greenAccent.withOpacity(0.15)
+                        ? HamsaColors.greenAccent.withValues(alpha: 0.15)
                         : HamsaColors.bgElevated,
                     borderRadius: BorderRadius.circular(100),
                     border: Border.all(

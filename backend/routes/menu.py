@@ -101,6 +101,10 @@ def get_menu_items(
             }
             for o in raw_options
         ]
+        clean_crops = [
+            {"name_en": c.get("name_en", ""), "name_ar": c.get("name_ar", "")}
+            for c in i.get("crops", [])
+        ]
         result.append({
             "id": i["id"],
             "category_id": i.get("category_id", ""),
@@ -108,6 +112,7 @@ def get_menu_items(
             "name_ar": i.get("name_ar", ""),
             "description_en": i.get("description_en", ""),
             "description_ar": i.get("description_ar", ""),
+            "crops": clean_crops,
             "price": i.get("price", 0.0),
             "available": i.get("available", True),
             "options": clean_options,
@@ -132,6 +137,10 @@ def get_menu_item(item_id: str):
         }
         for o in raw_options
     ]
+    clean_crops = [
+        {"name_en": c.get("name_en", ""), "name_ar": c.get("name_ar", "")}
+        for c in i.get("crops", [])
+    ]
     return {
         "id": i["id"],
         "category_id": i.get("category_id", ""),
@@ -139,6 +148,7 @@ def get_menu_item(item_id: str):
         "name_ar": i.get("name_ar", ""),
         "description_en": i.get("description_en", ""),
         "description_ar": i.get("description_ar", ""),
+        "crops": clean_crops,
         "price": i.get("price", 0.0),
         "available": i.get("available", True),
         "options": clean_options,

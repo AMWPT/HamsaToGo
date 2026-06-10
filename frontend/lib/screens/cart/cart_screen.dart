@@ -40,7 +40,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(e.toString()),
-          backgroundColor: HamsaColors.error.withOpacity(0.9),
+          backgroundColor: HamsaColors.error.withValues(alpha: 0.9),
           behavior: SnackBarBehavior.floating,
         ),
       );
@@ -150,7 +150,7 @@ class _CartItemTile extends StatelessWidget {
       background: Container(
         margin: const EdgeInsets.only(bottom: 12),
         decoration: BoxDecoration(
-          color: HamsaColors.error.withOpacity(0.15),
+          color: HamsaColors.error.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(16),
         ),
         alignment: Alignment.centerRight,
@@ -289,9 +289,9 @@ class _OrderSummary extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 36),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: HamsaColors.bgCard,
-        border: const Border(
+        border: Border(
           top: BorderSide(color: HamsaColors.border),
         ),
       ),
@@ -354,7 +354,7 @@ class _EmptyCart extends StatelessWidget {
         children: [
           const Text('🛒', style: TextStyle(fontSize: 64))
               .animate()
-              .scale(begin: Offset(0.5, 0.5), duration: 400.ms,
+              .scale(begin: const Offset(0.5, 0.5), duration: 400.ms,
                   curve: Curves.easeOutBack),
           const SizedBox(height: 20),
           Text(

@@ -10,6 +10,12 @@ class MenuOption(BaseModel):
     price_modifiers: Dict[str, float] = {}   # {"Coconut Milk (+5 SAR)": 5.0}
 
 
+# ─── Coffee Crop (origin the customer must pick) ─────────────
+class Crop(BaseModel):
+    name_en: str                       # "Brazilian"
+    name_ar: str                       # "برازيلي"
+
+
 # ─── Category ────────────────────────────────────────────────
 class CategoryCreate(BaseModel):
     name_en: str               # "Coffee"
@@ -40,6 +46,7 @@ class MenuItemCreate(BaseModel):
     name_ar: str               # "كابتشينو"
     description_en: Optional[str] = ""
     description_ar: Optional[str] = ""
+    crops: List[Crop] = []          # Coffee origins the customer chooses from
     price: float
     available: bool = True
     options: List[MenuOption] = []
@@ -52,6 +59,7 @@ class MenuItemUpdate(BaseModel):
     name_ar: Optional[str] = None
     description_en: Optional[str] = None
     description_ar: Optional[str] = None
+    crops: Optional[List[Crop]] = None
     price: Optional[float] = None
     available: Optional[bool] = None
     options: Optional[List[MenuOption]] = None
@@ -65,6 +73,7 @@ class MenuItemResponse(BaseModel):
     name_ar: str
     description_en: Optional[str] = ""
     description_ar: Optional[str] = ""
+    crops: List[Crop] = []
     price: float
     available: bool
     options: List[MenuOption]

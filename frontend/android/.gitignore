@@ -1,8 +1,7 @@
-gradle-wrapper.jar
+# Note: the Gradle wrapper (gradle-wrapper.jar, gradlew, gradlew.bat) is
+# intentionally committed so fresh clones can build without extra setup.
 /.gradle
 /captures/
-/gradlew
-/gradlew.bat
 /local.properties
 GeneratedPluginRegistrant.java
 .cxx/

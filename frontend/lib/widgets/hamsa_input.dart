@@ -42,6 +42,12 @@ class _HamsaInputState extends State<HamsaInput> {
   @override
   Widget build(BuildContext context) {
     final isObscure = widget.obscure && _obscured;
+    // Arabic/RTL fields must use the Noor font — Peignot (body) has no
+    // Arabic glyphs, so typed Arabic would render blank.
+    final isRtl = widget.textDirection == TextDirection.rtl;
+    final inputStyle = isRtl
+        ? HamsaText.arabic(size: 15, color: HamsaColors.cream)
+        : HamsaText.body(size: 15, color: HamsaColors.cream);
 
     return Focus(
       onFocusChange: (v) => setState(() => _focused = v),
@@ -51,7 +57,7 @@ class _HamsaInputState extends State<HamsaInput> {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: _focused
-                ? HamsaColors.greenAccent.withOpacity(0.8)
+                ? HamsaColors.greenAccent.withValues(alpha: 0.8)
                 : HamsaColors.border,
             width: _focused ? 1.5 : 1,
           ),
@@ -66,7 +72,7 @@ class _HamsaInputState extends State<HamsaInput> {
           autofocus: widget.autofocus,
           maxLines: widget.maxLines,
           textDirection: widget.textDirection,
-          style: HamsaText.body(size: 15, color: HamsaColors.cream),
+          style: inputStyle,
           decoration: InputDecoration(
             labelText: widget.label,
             hintText: widget.hint,

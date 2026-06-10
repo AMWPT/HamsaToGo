@@ -60,6 +60,14 @@ class ApiService {
     return (res.data as Map<String, dynamic>)['success'] == true;
   }
 
+  /// Staff login via Firebase phone OTP. [idToken] = Firebase ID token.
+  Future<bool> verifyAdminPhone(String idToken) async {
+    final res = await _dio.post('/auth/admin/phone-verify', data: {
+      'id_token': idToken,
+    });
+    return (res.data as Map<String, dynamic>)['success'] == true;
+  }
+
   // ─── Menu ──────────────────────────────────────────────────
 
   Future<List<Category>> getCategories() async {

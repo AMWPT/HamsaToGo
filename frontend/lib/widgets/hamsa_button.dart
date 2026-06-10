@@ -89,7 +89,7 @@ class _HamsaButtonState extends State<HamsaButton>
               boxShadow: widget.style == HamsaButtonStyle.primary
                   ? [
                       BoxShadow(
-                        color: HamsaColors.greenAccent.withOpacity(0.25),
+                        color: HamsaColors.greenAccent.withValues(alpha: 0.25),
                         blurRadius: 20,
                         offset: const Offset(0, 8),
                       ),
@@ -97,7 +97,7 @@ class _HamsaButtonState extends State<HamsaButton>
                   : widget.style == HamsaButtonStyle.gold
                       ? [
                           BoxShadow(
-                            color: HamsaColors.gold.withOpacity(0.3),
+                            color: HamsaColors.gold.withValues(alpha: 0.3),
                             blurRadius: 16,
                             offset: const Offset(0, 6),
                           ),

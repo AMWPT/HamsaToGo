@@ -184,7 +184,7 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
           end: Alignment.bottomCenter,
           colors: [
             HamsaColors.bgDeep,
-            HamsaColors.bgDeep.withOpacity(progress > 0.5 ? 1 : 0),
+            HamsaColors.bgDeep.withValues(alpha: progress > 0.5 ? 1 : 0),
           ],
         ),
       ),
@@ -453,7 +453,7 @@ class _CartFAB extends ConsumerWidget {
           borderRadius: BorderRadius.circular(100),
           boxShadow: [
             BoxShadow(
-              color: HamsaColors.greenAccent.withOpacity(0.4),
+              color: HamsaColors.greenAccent.withValues(alpha: 0.4),
               blurRadius: 24,
               offset: const Offset(0, 8),
             ),
@@ -465,7 +465,7 @@ class _CartFAB extends ConsumerWidget {
               width: 26,
               height: 26,
               decoration: BoxDecoration(
-                color: HamsaColors.bgDeep.withOpacity(0.25),
+                color: HamsaColors.bgDeep.withValues(alpha: 0.25),
                 shape: BoxShape.circle,
               ),
               child: Center(

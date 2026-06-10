@@ -83,7 +83,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
                   center: const Alignment(0, -0.2),
                   radius: 1.4,
                   colors: [
-                    HamsaColors.greenBrand.withOpacity(0.35),
+                    HamsaColors.greenBrand.withValues(alpha: 0.35),
                     HamsaColors.bgDeep,
                   ],
                 ),

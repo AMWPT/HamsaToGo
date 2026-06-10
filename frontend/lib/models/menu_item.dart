@@ -25,6 +25,32 @@ class MenuOption {
       };
 }
 
+class Crop {
+  final String nameEn;
+  final String nameAr;
+
+  const Crop({required this.nameEn, required this.nameAr});
+
+  factory Crop.fromJson(Map<String, dynamic> json) => Crop(
+        nameEn: (json['name_en'] as String?) ?? '',
+        nameAr: (json['name_ar'] as String?) ?? '',
+      );
+
+  Map<String, dynamic> toJson() => {
+        'name_en': nameEn,
+        'name_ar': nameAr,
+      };
+
+  String name(String locale) => locale == 'ar' ? nameAr : nameEn;
+
+  @override
+  bool operator ==(Object other) =>
+      other is Crop && other.nameEn == nameEn && other.nameAr == nameAr;
+
+  @override
+  int get hashCode => Object.hash(nameEn, nameAr);
+}
+
 class Category {
   final String id;
   final String nameEn;
@@ -58,6 +84,7 @@ class MenuItem {
   final String nameAr;
   final String descriptionEn;
   final String descriptionAr;
+  final List<Crop> crops;
   final double price;
   final bool available;
   final List<MenuOption> options;
@@ -70,6 +97,7 @@ class MenuItem {
     required this.nameAr,
     required this.descriptionEn,
     required this.descriptionAr,
+    this.crops = const [],
     required this.price,
     required this.available,
     required this.options,
@@ -83,6 +111,10 @@ class MenuItem {
         nameAr: json['name_ar'] as String,
         descriptionEn: (json['description_en'] as String?) ?? '',
         descriptionAr: (json['description_ar'] as String?) ?? '',
+        crops: (json['crops'] as List<dynamic>?)
+                ?.map((c) => Crop.fromJson(c as Map<String, dynamic>))
+                .toList() ??
+            const [],
         price: (json['price'] as num).toDouble(),
         available: json['available'] as bool? ?? true,
         options: (json['options'] as List<dynamic>?)

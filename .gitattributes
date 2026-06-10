@@ -1,0 +1,11 @@
+# Keep the Gradle wrapper scripts working on every platform regardless of
+# each collaborator's core.autocrlf setting.
+gradlew      text eol=lf
+*.sh         text eol=lf
+gradlew.bat  text eol=crlf
+*.bat        text eol=crlf
+
+# Never apply line-ending conversion to binary artifacts.
+*.jar        binary
+*.keystore   binary
+*.jks        binary

@@ -77,7 +77,7 @@ class MenuItemCard extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 12, vertical: 5),
                             decoration: BoxDecoration(
-                              color: HamsaColors.greenBrand.withOpacity(0.4),
+                              color: HamsaColors.greenBrand.withValues(alpha: 0.4),
                               borderRadius: BorderRadius.circular(100),
                               border: Border.all(color: HamsaColors.border),
                             ),
@@ -102,7 +102,7 @@ class MenuItemCard extends StatelessWidget {
                   left: isAr ? 0 : 10,
                   right: isAr ? 10 : 0,
                 ),
-                child: Icon(
+                child: const Icon(
                   Icons.arrow_forward_ios_rounded,
                   size: 15,
                   color: HamsaColors.muted,

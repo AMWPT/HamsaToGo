@@ -24,7 +24,7 @@ class LanguageScreen extends ConsumerWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    HamsaColors.greenBrand.withOpacity(0.2),
+                    HamsaColors.greenBrand.withValues(alpha: 0.2),
                     HamsaColors.bgDeep,
                     HamsaColors.bgDeep,
                   ],
@@ -44,7 +44,7 @@ class LanguageScreen extends ConsumerWidget {
                   const HamsaLogo(size: 100)
                       .animate()
                       .fadeIn(duration: 600.ms)
-                      .scale(begin: Offset(0.85, 0.85)),
+                      .scale(begin: const Offset(0.85, 0.85)),
 
                   const SizedBox(height: 20),
 

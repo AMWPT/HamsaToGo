@@ -197,8 +197,8 @@ class _StatusHero extends StatelessWidget {
           height: 120,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
-            color: color.withOpacity(0.1),
-            border: Border.all(color: color.withOpacity(0.3), width: 2),
+            color: color.withValues(alpha: 0.1),
+            border: Border.all(color: color.withValues(alpha: 0.3), width: 2),
           ),
           child: Center(
             child: Text(emoji, style: const TextStyle(fontSize: 52)),
@@ -314,7 +314,7 @@ class _ProgressTimeline extends StatelessWidget {
                           ? [
                               BoxShadow(
                                 color: HamsaColors.greenAccent
-                                    .withOpacity(0.5),
+                                    .withValues(alpha: 0.5),
                                 blurRadius: 12,
                                 spreadRadius: 2,
                               ),
