@@ -1,7 +1,7 @@
 import os
 from fastapi import APIRouter, HTTPException, status
 from firebase_admin import auth as firebase_auth
-from models.user import PhoneVerifyRequest, UserUpdate, UserResponse, AdminLogin
+from models.user import PhoneVerifyRequest, UserUpdate, UserResponse, AdminLogin, AdminPhoneVerify
 from services import firestore as db
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
@@ -19,8 +19,9 @@ def phone_verify(data: PhoneVerifyRequest):
     """
     # Verify the Firebase ID token
     try:
-        decoded = firebase_auth.verify_id_token(data.id_token)
+        decoded = firebase_auth.verify_id_token(data.id_token, clock_skew_seconds=60)
     except Exception as e:
+        print(f"[AUTH ERROR] Token verification failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {str(e)}",
@@ -90,4 +91,43 @@ def verify_admin(credentials: AdminLogin):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid admin credentials.",
         )
+    return {"success": True}
+
+
+# ─── Admin Login via Phone OTP ────────────────────────────────
+def _normalize_phone(p: str) -> str:
+    """Strip spaces/dashes so '+966 5..' and '+9665..' compare equal."""
+    return "".join(p.split()).replace("-", "")
+
+
+@router.post("/admin/phone-verify")
+def verify_admin_phone(data: AdminPhoneVerify):
+    """
+    Staff login via Firebase phone OTP.
+    Verifies the Firebase ID token server-side, then checks the phone
+    number against the single whitelisted STAFF_PHONE.
+    """
+    staff_phone = os.getenv("STAFF_PHONE", "")
+    if not staff_phone:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Staff phone not configured.",
+        )
+
+    try:
+        decoded = firebase_auth.verify_id_token(data.id_token, clock_skew_seconds=60)
+    except Exception as e:
+        print(f"[AUTH ERROR] Admin token verification failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {str(e)}",
+        )
+
+    phone = decoded.get("phone_number", "")
+    if _normalize_phone(phone) != _normalize_phone(staff_phone):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="This number is not authorized for staff access.",
+        )
+
     return {"success": True}

@@ -7,7 +7,6 @@ import '../../core/router.dart';
 import '../../models/order.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/order_provider.dart';
-import '../../widgets/hamsa_logo.dart';
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -242,9 +241,9 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: color.withOpacity(0.25)),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
       ),
       child: Column(
         children: [
@@ -256,7 +255,7 @@ class _StatChip extends StatelessWidget {
           Text(
             label,
             style:
-                HamsaText.body(size: 11, color: color.withOpacity(0.7)),
+                HamsaText.body(size: 11, color: color.withValues(alpha: 0.7)),
           ),
         ],
       ),
@@ -334,7 +333,7 @@ class AdminOrderCard extends ConsumerWidget {
                           ),
                           const SizedBox(height: 3),
                           Text(
-                            '${order.items.map((i) => '${i.quantity}× ${i.nameEn}').join(', ')}',
+                            order.items.map((i) => '${i.quantity}× ${i.nameEn}').join(', '),
                             style: HamsaText.body(
                                 size: 11, color: HamsaColors.muted),
                             maxLines: 2,
@@ -345,7 +344,7 @@ class AdminOrderCard extends ConsumerWidget {
                             padding: const EdgeInsets.symmetric(
                                 horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
-                              color: statusColor.withOpacity(0.12),
+                              color: statusColor.withValues(alpha: 0.12),
                               borderRadius: BorderRadius.circular(100),
                             ),
                             child: Text(
@@ -369,10 +368,10 @@ class AdminOrderCard extends ConsumerWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.15),
+                            color: statusColor.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                                color: statusColor.withOpacity(0.4)),
+                                color: statusColor.withValues(alpha: 0.4)),
                           ),
                           child: Text(
                             _nextLabel(nextStatus),
@@ -415,7 +414,7 @@ class AdminOrderCard extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(e.toString()),
-            backgroundColor: HamsaColors.error.withOpacity(0.9),
+            backgroundColor: HamsaColors.error.withValues(alpha: 0.9),
           ),
         );
       }

@@ -168,7 +168,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    HamsaColors.greenBrand.withOpacity(0.5),
+                    HamsaColors.greenBrand.withValues(alpha: 0.5),
                     HamsaColors.bgDeep,
                   ],
                 ),
@@ -185,7 +185,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   const SizedBox(height: 32),
 
                   const HamsaLogo(size: 100)
-                      .animate().fadeIn(duration: 500.ms).scale(begin: Offset(0.8, 0.8)),
+                      .animate().fadeIn(duration: 500.ms).scale(begin: const Offset(0.8, 0.8)),
 
                   const SizedBox(height: 16),
 
@@ -416,7 +416,7 @@ class _PhoneFieldState extends State<_PhoneField> {
           color: HamsaColors.inputBg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: _focused ? HamsaColors.greenAccent.withOpacity(0.8) : HamsaColors.border,
+            color: _focused ? HamsaColors.greenAccent.withValues(alpha: 0.8) : HamsaColors.border,
             width: _focused ? 1.5 : 1,
           ),
         ),
@@ -425,7 +425,7 @@ class _PhoneFieldState extends State<_PhoneField> {
             // Country code
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 border: Border(
                   right: BorderSide(color: HamsaColors.border),
                 ),

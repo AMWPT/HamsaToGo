@@ -1,4 +1,6 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -6,7 +8,6 @@ import '../../core/theme.dart';
 import '../../core/router.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/hamsa_button.dart';
-import '../../widgets/hamsa_input.dart';
 import '../../widgets/hamsa_logo.dart';
 
 class AdminLoginScreen extends ConsumerStatefulWidget {
@@ -17,39 +18,127 @@ class AdminLoginScreen extends ConsumerStatefulWidget {
 }
 
 class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
-  final _passCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _otpCtrl = TextEditingController();
+  String? _verificationId;
+
+  bool _step2 = false; // true = showing OTP field
+  bool _sending = false; // waiting for SMS
+  bool _verifying = false; // waiting for backend
 
   @override
   void dispose() {
-    _passCtrl.dispose();
+    _phoneCtrl.dispose();
+    _otpCtrl.dispose();
     super.dispose();
   }
 
-  Future<void> _login() async {
-    if (_passCtrl.text.isEmpty) return;
-    final success = await ref
-        .read(authProvider.notifier)
-        .loginAdmin(_passCtrl.text);
-    if (!mounted) return;
-    if (!success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Incorrect password',
-            style: HamsaText.body(size: 13),
-          ),
-          backgroundColor: HamsaColors.error.withOpacity(0.9),
-          behavior: SnackBarBehavior.floating,
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        ),
-      );
+  String get _fullPhone {
+    final raw = _phoneCtrl.text.trim();
+    if (raw.startsWith('+')) return raw;
+    final digits = raw.startsWith('0') ? raw.substring(1) : raw;
+    return '+966$digits';
+  }
+
+  // ── Send OTP ─────────────────────────────────────────────────
+  Future<void> _sendCode() async {
+    final phone = _fullPhone;
+    if (phone.length < 10) {
+      _showError('Please enter a valid phone number');
+      return;
     }
+
+    setState(() => _sending = true);
+
+    await FirebaseAuth.instance.verifyPhoneNumber(
+      phoneNumber: phone,
+      timeout: const Duration(seconds: 60),
+      verificationCompleted: (PhoneAuthCredential credential) async {
+        await _signInWithCredential(credential);
+      },
+      verificationFailed: (FirebaseAuthException e) {
+        setState(() => _sending = false);
+        _showError(e.message ?? 'Failed to send code');
+      },
+      codeSent: (String verificationId, int? resendToken) {
+        setState(() {
+          _verificationId = verificationId;
+          _sending = false;
+          _step2 = true;
+        });
+      },
+      codeAutoRetrievalTimeout: (String verificationId) {
+        _verificationId = verificationId;
+      },
+    );
+  }
+
+  // ── Verify OTP ───────────────────────────────────────────────
+  Future<void> _verifyCode() async {
+    final code = _otpCtrl.text.trim();
+    if (code.length != 6) {
+      _showError('Enter the 6-digit code');
+      return;
+    }
+    if (_verificationId == null) return;
+
+    setState(() => _verifying = true);
+
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: _verificationId!,
+        smsCode: code,
+      );
+      await _signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      setState(() => _verifying = false);
+      _showError(e.message ?? 'Invalid code');
+    }
+  }
+
+  Future<void> _signInWithCredential(PhoneAuthCredential credential) async {
+    try {
+      final userCredential =
+          await FirebaseAuth.instance.signInWithCredential(credential);
+      final idToken = await userCredential.user!.getIdToken();
+
+      final success =
+          await ref.read(authProvider.notifier).loginAdminPhone(idToken!);
+
+      if (!mounted) return;
+      if (!success) {
+        setState(() => _verifying = false);
+        // Drop the Firebase session so an unauthorized number can't linger.
+        await FirebaseAuth.instance.signOut();
+        final error = ref.read(authProvider).error;
+        _showError(error == 'Not authorized'
+            ? 'This number is not authorized for staff access.'
+            : 'Could not verify staff access. Please try again.');
+      }
+      // On success the router redirects to the admin dashboard automatically.
+    } on FirebaseAuthException catch (e) {
+      setState(() => _verifying = false);
+      _showError(e.message ?? 'Verification failed');
+    } catch (e) {
+      setState(() => _verifying = false);
+      _showError('Something went wrong. Try again.');
+    }
+  }
+
+  void _showError(String msg) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: HamsaText.body(size: 13)),
+        backgroundColor: HamsaColors.error.withValues(alpha: 0.9),
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final auth = ref.watch(authProvider);
+    final isBusy = _sending || _verifying;
 
     return Scaffold(
       backgroundColor: HamsaColors.bgDeep,
@@ -63,7 +152,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
                   center: Alignment.topCenter,
                   radius: 1.2,
                   colors: [
-                    HamsaColors.greenBrand.withOpacity(0.15),
+                    HamsaColors.greenBrand.withValues(alpha: 0.15),
                     HamsaColors.bgDeep,
                   ],
                 ),
@@ -82,7 +171,16 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
                   Align(
                     alignment: Alignment.centerLeft,
                     child: GestureDetector(
-                      onTap: () => context.go(AppRoutes.login),
+                      onTap: () {
+                        if (_step2) {
+                          setState(() {
+                            _step2 = false;
+                            _otpCtrl.clear();
+                          });
+                        } else {
+                          context.go(AppRoutes.login);
+                        }
+                      },
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
@@ -124,46 +222,42 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
 
                   Text(
                     'Staff Access',
-                    style: HamsaText.display(
-                        size: 34, color: HamsaColors.cream),
-                  )
-                      .animate(delay: 100.ms)
-                      .fadeIn(duration: 400.ms),
+                    style:
+                        HamsaText.display(size: 34, color: HamsaColors.cream),
+                  ).animate(delay: 100.ms).fadeIn(duration: 400.ms),
 
                   const SizedBox(height: 6),
 
                   Text(
-                    'This device is authorized for staff only',
-                    style: HamsaText.body(
-                        size: 13, color: HamsaColors.muted),
+                    _step2
+                        ? 'Enter the 6-digit code sent to $_fullPhone'
+                        : 'Sign in with the authorized staff phone number',
+                    style: HamsaText.body(size: 13, color: HamsaColors.muted),
                     textAlign: TextAlign.center,
-                  )
-                      .animate(delay: 200.ms)
-                      .fadeIn(duration: 400.ms),
+                  ).animate(delay: 200.ms).fadeIn(duration: 400.ms),
 
                   const SizedBox(height: 48),
 
-                  HamsaInput(
-                    label: 'Staff Password',
-                    controller: _passCtrl,
-                    obscure: true,
-                    prefixIcon: Icons.vpn_key_outlined,
-                    autofocus: true,
-                  )
-                      .animate(delay: 300.ms)
-                      .fadeIn(duration: 400.ms)
-                      .slideY(begin: 0.2, end: 0),
+                  // Phone or OTP input
+                  if (!_step2)
+                    _PhoneField(controller: _phoneCtrl)
+                        .animate(delay: 300.ms)
+                        .fadeIn(duration: 400.ms)
+                        .slideY(begin: 0.2, end: 0)
+                  else
+                    _OtpField(controller: _otpCtrl, onSubmit: _verifyCode)
+                        .animate()
+                        .fadeIn(duration: 400.ms)
+                        .slideY(begin: 0.2, end: 0),
 
                   const SizedBox(height: 24),
 
                   HamsaButton(
-                    label: 'Access Dashboard',
-                    onTap: auth.isLoading ? null : _login,
-                    isLoading: auth.isLoading,
+                    label: _step2 ? 'Verify & Enter' : 'Send Code',
+                    onTap: isBusy ? null : (_step2 ? _verifyCode : _sendCode),
+                    isLoading: isBusy,
                     style: HamsaButtonStyle.gold,
-                  )
-                      .animate(delay: 400.ms)
-                      .fadeIn(duration: 400.ms),
+                  ).animate(delay: 400.ms).fadeIn(duration: 400.ms),
 
                   const Spacer(flex: 2),
 
@@ -178,9 +272,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
                     'Hamsa Coffee Roasters',
                     style: HamsaText.caption(
                         size: 11, color: HamsaColors.subtle),
-                  )
-                      .animate(delay: 600.ms)
-                      .fadeIn(duration: 400.ms),
+                  ).animate(delay: 600.ms).fadeIn(duration: 400.ms),
 
                   const SizedBox(height: 32),
                 ],
@@ -188,6 +280,111 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ── Phone input with +966 prefix ─────────────────────────────
+class _PhoneField extends StatefulWidget {
+  final TextEditingController controller;
+  const _PhoneField({required this.controller});
+
+  @override
+  State<_PhoneField> createState() => _PhoneFieldState();
+}
+
+class _PhoneFieldState extends State<_PhoneField> {
+  bool _focused = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: (v) => setState(() => _focused = v),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: HamsaColors.inputBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: _focused
+                ? HamsaColors.gold.withValues(alpha: 0.8)
+                : HamsaColors.border,
+            width: _focused ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              decoration: const BoxDecoration(
+                border: Border(right: BorderSide(color: HamsaColors.border)),
+              ),
+              child: Text('+966',
+                  style: HamsaText.body(
+                      size: 15,
+                      color: HamsaColors.cream,
+                      weight: FontWeight.w600)),
+            ),
+            Expanded(
+              child: TextField(
+                controller: widget.controller,
+                autofocus: true,
+                keyboardType: TextInputType.phone,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                style: HamsaText.body(size: 16, color: HamsaColors.cream),
+                decoration: InputDecoration(
+                  hintText: '5XX XXX XXXX',
+                  hintStyle:
+                      HamsaText.body(size: 15, color: HamsaColors.subtle),
+                  border: InputBorder.none,
+                  contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── OTP input field ──────────────────────────────────────────
+class _OtpField extends StatelessWidget {
+  final TextEditingController controller;
+  final VoidCallback onSubmit;
+  const _OtpField({required this.controller, required this.onSubmit});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: HamsaColors.inputBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: HamsaColors.border),
+      ),
+      child: TextField(
+        controller: controller,
+        autofocus: true,
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(6),
+        ],
+        textAlign: TextAlign.center,
+        style: HamsaText.body(
+            size: 28,
+            color: HamsaColors.cream,
+            weight: FontWeight.w700,
+            letterSpacing: 8),
+        decoration: const InputDecoration(
+          hintText: '------',
+          border: InputBorder.none,
+          contentPadding: EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+        ),
+        onSubmitted: (_) => onSubmit(),
       ),
     );
   }

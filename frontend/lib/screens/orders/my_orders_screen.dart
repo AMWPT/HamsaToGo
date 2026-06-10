@@ -193,12 +193,12 @@ class OrderTimelineCard extends StatelessWidget {
                           padding: const EdgeInsets.symmetric(
                               horizontal: 10, vertical: 5),
                           decoration: BoxDecoration(
-                            color: statusColor.withOpacity(0.12),
+                            color: statusColor.withValues(alpha: 0.12),
                             borderRadius:
                                 BorderRadius.circular(100),
                             border: Border.all(
                                 color: statusColor
-                                    .withOpacity(0.4)),
+                                    .withValues(alpha: 0.4)),
                           ),
                           child: Text(
                             isAr

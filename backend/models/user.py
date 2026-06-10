@@ -28,3 +28,8 @@ class AdminLogin(BaseModel):
     """Fixed admin login (single shared device)."""
     email: str
     password: str
+
+
+class AdminPhoneVerify(BaseModel):
+    """Staff login via Firebase phone OTP (single whitelisted number)."""
+    id_token: str           # Firebase ID token from client

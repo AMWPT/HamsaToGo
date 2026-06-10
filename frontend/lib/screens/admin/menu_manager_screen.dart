@@ -181,7 +181,7 @@ class _MenuItemRow extends StatelessWidget {
         border: Border.all(
           color: item.available
               ? HamsaColors.border
-              : HamsaColors.error.withOpacity(0.2),
+              : HamsaColors.error.withValues(alpha: 0.2),
         ),
       ),
       child: Row(
@@ -334,6 +334,7 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
   final _descEnCtrl = TextEditingController();
   final _descArCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
+  final List<_CropDraft> _crops = [];
   final _catIdCtrl = TextEditingController();
   bool _available = true;
   bool _saving = false;
@@ -348,6 +349,9 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
       _descEnCtrl.text = e.descriptionEn;
       _descArCtrl.text = e.descriptionAr;
       _priceCtrl.text = e.price.toString();
+      for (final c in e.crops) {
+        _crops.add(_CropDraft(nameEn: c.nameEn, nameAr: c.nameAr));
+      }
       _catIdCtrl.text = e.categoryId;
       _available = e.available;
     }
@@ -360,6 +364,9 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
     _descEnCtrl.dispose();
     _descArCtrl.dispose();
     _priceCtrl.dispose();
+    for (final c in _crops) {
+      c.dispose();
+    }
     _catIdCtrl.dispose();
     super.dispose();
   }
@@ -424,7 +431,77 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
               maxLines: 2,
               textDirection: TextDirection.rtl,
             ),
+            const SizedBox(height: 20),
+
+            // ── Coffee Crops ────────────────────────────────────
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  'Coffee Crops',
+                  style: HamsaText.body(
+                      size: 14,
+                      weight: FontWeight.w600,
+                      color: HamsaColors.cream),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _crops.add(_CropDraft())),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.add_rounded,
+                          color: HamsaColors.greenAccent, size: 18),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Add crop',
+                        style: HamsaText.body(
+                            size: 13, color: HamsaColors.greenAccent),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Customers must pick one when ordering. Leave empty if not applicable.',
+              style: HamsaText.body(size: 11, color: HamsaColors.muted),
+            ),
             const SizedBox(height: 12),
+            ..._crops.asMap().entries.map((entry) {
+              final i = entry.key;
+              final crop = entry.value;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Expanded(
+                      child: HamsaInput(
+                        label: 'Crop (EN)',
+                        controller: crop.enCtrl,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: HamsaInput(
+                        label: 'المحصول (عربي)',
+                        controller: crop.arCtrl,
+                        textDirection: TextDirection.rtl,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline_rounded,
+                          color: HamsaColors.error, size: 20),
+                      onPressed: () => setState(() {
+                        _crops.removeAt(i).dispose();
+                      }),
+                    ),
+                  ],
+                ),
+              );
+            }),
+            const SizedBox(height: 8),
             Row(
               children: [
                 Expanded(
@@ -457,7 +534,7 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
                 Switch(
                   value: _available,
                   onChanged: (v) => setState(() => _available = v),
-                  activeColor: HamsaColors.greenAccent,
+                  activeThumbColor: HamsaColors.greenAccent,
                 ),
               ],
             ),
@@ -483,6 +560,15 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
         'name_ar': _nameArCtrl.text.trim(),
         'description_en': _descEnCtrl.text.trim(),
         'description_ar': _descArCtrl.text.trim(),
+        'crops': [
+          for (final c in _crops)
+            if (c.enCtrl.text.trim().isNotEmpty ||
+                c.arCtrl.text.trim().isNotEmpty)
+              {
+                'name_en': c.enCtrl.text.trim(),
+                'name_ar': c.arCtrl.text.trim(),
+              },
+        ],
         'price': double.tryParse(_priceCtrl.text) ?? 0,
         'category_id': _catIdCtrl.text.trim(),
         'available': _available,
@@ -497,5 +583,20 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+}
+
+// ─── Editable crop row holder ────────────────────────────────
+class _CropDraft {
+  final TextEditingController enCtrl;
+  final TextEditingController arCtrl;
+
+  _CropDraft({String nameEn = '', String nameAr = ''})
+      : enCtrl = TextEditingController(text: nameEn),
+        arCtrl = TextEditingController(text: nameAr);
+
+  void dispose() {
+    enCtrl.dispose();
+    arCtrl.dispose();
   }
 }

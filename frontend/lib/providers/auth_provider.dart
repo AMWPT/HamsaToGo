@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user.dart';
@@ -107,12 +108,36 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Staff login via Firebase phone OTP.
+  /// [idToken] = Firebase ID token from a verified phone sign-in.
+  Future<bool> loginAdminPhone(String idToken) async {
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      final valid = await _api.verifyAdminPhone(idToken);
+      if (valid) {
+        await _storage.write(key: StorageKeys.isAdmin, value: 'true');
+        state = const AuthState(isAdmin: true);
+        return true;
+      } else {
+        state = state.copyWith(isLoading: false, error: 'Not authorized');
+        return false;
+      }
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _parseError(e));
+      return false;
+    }
+  }
+
   Future<void> logout() async {
     await _storage.deleteAll();
     state = const AuthState();
   }
 
   String _parseError(dynamic e) {
+    if (e is DioException) {
+      final detail = e.response?.data?['detail'];
+      if (detail != null) return detail.toString();
+    }
     final msg = e.toString();
     if (msg.contains('NO_ACCOUNT')) return 'NO_ACCOUNT';
     return msg.replaceAll('Exception: ', '');
