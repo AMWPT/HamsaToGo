@@ -33,6 +33,12 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
   /// Stable key used to carry the chosen crop through cart → order.
   static const _cropKey = 'Crop';
 
+  /// Fetch the item once. Creating the future inside build() would re-run
+  /// the request on every setState (e.g. picking a crop), flashing the
+  /// loading spinner and resetting the screen.
+  late final Future<MenuItem> _itemFuture =
+      ref.read(apiServiceProvider).getMenuItem(widget.itemId);
+
   /// Total price modifier from selected options (e.g. +5 for coconut milk)
   double _calcModifier(MenuItem item) {
     double extra = 0;
@@ -45,24 +51,40 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
     return extra;
   }
 
+  void _showRequiredError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: HamsaText.body(size: 14, color: HamsaColors.bgDeep),
+        ),
+        backgroundColor: HamsaColors.error,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        duration: const Duration(seconds: 2),
+      ),
+    );
+  }
+
   void _addToCart(MenuItem item, String locale) {
     final isAr = locale == 'ar';
 
     // Crop is required whenever the item has crops configured.
     if (item.crops.isNotEmpty && _selectedCrop == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            isAr ? 'الرجاء اختيار المحصول' : 'Please choose a coffee crop',
-            style: HamsaText.body(size: 14, color: HamsaColors.bgDeep),
-          ),
-          backgroundColor: HamsaColors.error,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      _showRequiredError(
+          isAr ? 'الرجاء اختيار المحصول' : 'Please choose a coffee crop');
       return;
+    }
+
+    // Every option (Milk, Size, etc.) must be chosen before ordering.
+    for (final opt in item.options) {
+      final chosen = _selectedOptions[opt.name];
+      if (chosen == null || chosen.isEmpty) {
+        _showRequiredError(isAr
+            ? 'الرجاء اختيار: ${opt.name}'
+            : 'Please choose: ${opt.name}');
+        return;
+      }
     }
 
     final modifier = _calcModifier(item);
@@ -100,12 +122,11 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
   Widget build(BuildContext context) {
     final locale = ref.watch(localeProvider).languageCode;
     final isAr = locale == 'ar';
-    final api = ref.watch(apiServiceProvider);
 
     return Scaffold(
       backgroundColor: HamsaColors.bgDeep,
       body: FutureBuilder(
-        future: api.getMenuItem(widget.itemId),
+        future: _itemFuture,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(
@@ -403,14 +424,25 @@ class _OptionGroup extends StatelessWidget {
         crossAxisAlignment:
             isAr ? CrossAxisAlignment.end : CrossAxisAlignment.start,
         children: [
-          Text(
-            option.name,
-            style: HamsaText.body(
-              size: 15,
-              weight: FontWeight.w600,
-              color: HamsaColors.muted,
-              letterSpacing: 0.8,
-            ),
+          Row(
+            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                option.name,
+                style: HamsaText.body(
+                  size: 15,
+                  weight: FontWeight.w600,
+                  color: HamsaColors.muted,
+                  letterSpacing: 0.8,
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                isAr ? '(مطلوب)' : '(required)',
+                style: HamsaText.body(size: 12, color: HamsaColors.error),
+              ),
+            ],
           ),
           const SizedBox(height: 12),
           Wrap(
@@ -419,7 +451,6 @@ class _OptionGroup extends StatelessWidget {
             textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
             children: option.choices.map((choice) {
               final isSelected = selected == choice;
-              final modifier = option.priceModifiers[choice] ?? 0;
               return GestureDetector(
                 onTap: () => onSelect(choice),
                 child: AnimatedContainer(

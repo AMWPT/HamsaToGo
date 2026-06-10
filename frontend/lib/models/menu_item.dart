@@ -42,6 +42,13 @@ class Crop {
       };
 
   String name(String locale) => locale == 'ar' ? nameAr : nameEn;
+
+  @override
+  bool operator ==(Object other) =>
+      other is Crop && other.nameEn == nameEn && other.nameAr == nameAr;
+
+  @override
+  int get hashCode => Object.hash(nameEn, nameAr);
 }
 
 class Category {
