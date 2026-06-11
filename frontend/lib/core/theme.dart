@@ -48,6 +48,8 @@ abstract class HamsaColors {
 
 // ─── Hamsa Typography ─────────────────────────────────────────
 abstract class HamsaText {
+  static const _arabicFallback = ['Noor'];
+
   /// Hero/display titles — Peignot LT Std Demi
   static TextStyle display({
     double size = 52,
@@ -59,6 +61,7 @@ abstract class HamsaText {
   }) =>
       TextStyle(
         fontFamily: 'Peignot',
+        fontFamilyFallback: _arabicFallback,
         fontSize: size,
         fontWeight: weight,
         color: color,
@@ -77,6 +80,7 @@ abstract class HamsaText {
   }) =>
       TextStyle(
         fontFamily: 'Peignot',
+        fontFamilyFallback: _arabicFallback,
         fontSize: size,
         fontWeight: weight,
         color: color,
@@ -94,6 +98,7 @@ abstract class HamsaText {
   }) =>
       TextStyle(
         fontFamily: 'Peignot',
+        fontFamilyFallback: _arabicFallback,
         fontSize: size,
         fontWeight: weight,
         color: color,
@@ -110,6 +115,7 @@ abstract class HamsaText {
   }) =>
       TextStyle(
         fontFamily: 'Peignot',
+        fontFamilyFallback: _arabicFallback,
         fontSize: size,
         fontWeight: weight,
         color: color,
@@ -138,6 +144,7 @@ abstract class HamsaText {
   }) =>
       TextStyle(
         fontFamily: 'Peignot',
+        fontFamilyFallback: _arabicFallback,
         fontSize: size,
         fontWeight: FontWeight.w600,
         color: color,
