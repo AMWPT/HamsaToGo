@@ -37,28 +37,30 @@ enum OrderStatus {
   String labelEn() {
     switch (this) {
       case received:
-        return 'Order Received';
+        return 'Order Placed';
       case inProgress:
-        return 'In Progress';
+        return 'Order Being Prepared';
       case ready:
-        return 'Ready for Pickup';
+        return 'Order Ready for Pickup';
       case pickedUp:
-        return 'Picked Up';
+        return 'Order Picked Up';
     }
   }
 
   String labelAr() {
     switch (this) {
       case received:
-        return 'تم استلام الطلب';
+        return 'تم تقديم الطلب';
       case inProgress:
-        return 'جاري التحضير';
+        return 'جاري تحضير الطلب';
       case ready:
-        return 'جاهز للاستلام';
+        return 'الطلب جاهز للاستلام';
       case pickedUp:
-        return 'تم الاستلام';
+        return 'تم استلام الطلب';
     }
   }
+
+  String label(bool isAr) => isAr ? labelAr() : labelEn();
 
   // Next valid status for admin
   OrderStatus? get next {
@@ -135,6 +137,7 @@ class OrderItemModel {
 
 class Order {
   final String id;
+  final int orderNumber; // sequential, 1-based; 0 = legacy order without one
   final String customerId;
   final List<OrderItemModel> items;
   final double totalPrice;
@@ -145,6 +148,7 @@ class Order {
 
   const Order({
     required this.id,
+    this.orderNumber = 0,
     required this.customerId,
     required this.items,
     required this.totalPrice,
@@ -154,8 +158,15 @@ class Order {
     this.updatedAt,
   });
 
+  /// Human-facing order number shown on customer and staff screens.
+  /// Legacy orders placed before sequential numbering fall back to
+  /// the short Firestore ID.
+  String get displayNumber =>
+      orderNumber > 0 ? '$orderNumber' : id.substring(0, 8).toUpperCase();
+
   factory Order.fromJson(Map<String, dynamic> json) => Order(
         id: json['id'] as String,
+        orderNumber: (json['order_number'] as num?)?.toInt() ?? 0,
         customerId: json['customer_id'] as String,
         items: (json['items'] as List<dynamic>)
             .map((i) => OrderItemModel.fromJson(i as Map<String, dynamic>))
@@ -179,6 +190,7 @@ class Order {
 
     return Order(
       id: doc.id,
+      orderNumber: (json['order_number'] as num?)?.toInt() ?? 0,
       customerId: json['customer_id'] as String,
       items: (json['items'] as List<dynamic>)
           .map((i) => OrderItemModel.fromJson(i as Map<String, dynamic>))

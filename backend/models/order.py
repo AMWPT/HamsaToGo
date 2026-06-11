@@ -46,6 +46,7 @@ class OrderStatusUpdate(BaseModel):
 
 class OrderResponse(BaseModel):
     id: str
+    order_number: int = 0              # sequential, 1-based; 0 = legacy order without one
     customer_id: str
     customer_name: str
     items: List[OrderItemResponse]

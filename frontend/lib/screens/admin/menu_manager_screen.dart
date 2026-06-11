@@ -123,7 +123,16 @@ class _MenuManagerScreenState extends ConsumerState<MenuManagerScreen> {
   Future<void> _toggle(String itemId) async {
     final api = ref.read(apiServiceProvider);
     await api.toggleAvailability(itemId);
-    ref.invalidate(allMenuItemsProvider(_selectedCategoryId));
+    _refreshItems();
+  }
+
+  /// Invalidate every cached menu list — both the staff one and the
+  /// customer-facing one (menuItemsProvider), across all category filters.
+  /// Otherwise the customer menu keeps serving its stale cache for the
+  /// rest of the session after staff add/edit/remove an item.
+  void _refreshItems() {
+    ref.invalidate(allMenuItemsProvider);
+    ref.invalidate(menuItemsProvider);
   }
 
   void _showAddSheet(BuildContext context) {
@@ -135,7 +144,7 @@ class _MenuManagerScreenState extends ConsumerState<MenuManagerScreen> {
         onSave: (data) async {
           final api = ref.read(apiServiceProvider);
           await api.createMenuItem(data);
-          ref.invalidate(allMenuItemsProvider(null));
+          _refreshItems();
         },
       ),
     );
@@ -151,7 +160,12 @@ class _MenuManagerScreenState extends ConsumerState<MenuManagerScreen> {
         onSave: (data) async {
           final api = ref.read(apiServiceProvider);
           await api.updateMenuItem(item.id, data);
-          ref.invalidate(allMenuItemsProvider(null));
+          _refreshItems();
+        },
+        onDelete: () async {
+          final api = ref.read(apiServiceProvider);
+          await api.deleteMenuItem(item.id);
+          _refreshItems();
         },
       ),
     );
@@ -318,26 +332,44 @@ class _FilterChip extends StatelessWidget {
 }
 
 // ─── Item Form Bottom Sheet ───────────────────────────────────
-class _ItemFormSheet extends StatefulWidget {
+class _ItemFormSheet extends ConsumerStatefulWidget {
   final MenuItem? existing;
   final Future<void> Function(Map<String, dynamic>) onSave;
+  final Future<void> Function()? onDelete;
 
-  const _ItemFormSheet({this.existing, required this.onSave});
+  const _ItemFormSheet({this.existing, required this.onSave, this.onDelete});
 
   @override
-  State<_ItemFormSheet> createState() => _ItemFormSheetState();
+  ConsumerState<_ItemFormSheet> createState() => _ItemFormSheetState();
 }
 
-class _ItemFormSheetState extends State<_ItemFormSheet> {
+class _ItemFormSheetState extends ConsumerState<_ItemFormSheet> {
+  /// Option names as stored on menu items (must match customer screens).
+  static const _tempOption = 'Temperature';
+  static const _milkOption = 'Milk';
+
+  /// "Coconut Milk (+5 SAR)" → name "Coconut Milk", surcharge 5.
+  static final _surchargeSuffix =
+      RegExp(r'\s*\(\+\s*(\d+(?:\.\d+)?)\s*SAR\)\s*$');
+
   final _nameEnCtrl = TextEditingController();
   final _nameArCtrl = TextEditingController();
   final _descEnCtrl = TextEditingController();
   final _descArCtrl = TextEditingController();
   final _priceCtrl = TextEditingController();
   final List<_CropDraft> _crops = [];
-  final _catIdCtrl = TextEditingController();
+  String? _selectedCategoryId;
   bool _available = true;
   bool _saving = false;
+
+  bool _hasTemperature = false;
+  final List<TextEditingController> _tempChoices = [];
+
+  bool _hasMilk = false;
+  final List<_MilkDraft> _milks = [];
+
+  /// Options other than Temperature/Milk (e.g. Size) — kept as-is on save.
+  final List<MenuOption> _otherOptions = [];
 
   @override
   void initState() {
@@ -352,8 +384,31 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
       for (final c in e.crops) {
         _crops.add(_CropDraft(nameEn: c.nameEn, nameAr: c.nameAr));
       }
-      _catIdCtrl.text = e.categoryId;
+      _selectedCategoryId = e.categoryId;
       _available = e.available;
+
+      for (final o in e.options) {
+        if (o.name == _tempOption) {
+          _hasTemperature = true;
+          for (final choice in o.choices) {
+            _tempChoices.add(TextEditingController(text: choice));
+          }
+        } else if (o.name == _milkOption) {
+          _hasMilk = true;
+          for (final choice in o.choices) {
+            final extra = o.priceModifiers[choice] ??
+                double.tryParse(
+                    _surchargeSuffix.firstMatch(choice)?.group(1) ?? '') ??
+                0;
+            _milks.add(_MilkDraft(
+              name: choice.replaceFirst(_surchargeSuffix, ''),
+              extra: extra,
+            ));
+          }
+        } else {
+          _otherOptions.add(o);
+        }
+      }
     }
   }
 
@@ -367,12 +422,63 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
     for (final c in _crops) {
       c.dispose();
     }
-    _catIdCtrl.dispose();
+    for (final t in _tempChoices) {
+      t.dispose();
+    }
+    for (final m in _milks) {
+      m.dispose();
+    }
     super.dispose();
+  }
+
+  // ─── Category type detection ───────────────────────────────
+  Category? _selectedCategory(List<Category> cats) {
+    for (final c in cats) {
+      if (c.id == _selectedCategoryId) return c;
+    }
+    return null;
+  }
+
+  bool _isDrink(Category? c) =>
+      c != null &&
+      (c.nameEn.toLowerCase().contains('drink') || c.nameAr.contains('مشروب'));
+
+  bool _isHotDrink(Category? c) =>
+      _isDrink(c) &&
+      (c!.nameEn.toLowerCase().contains('hot') || c.nameAr.contains('ساخن'));
+
+  void _toggleTemperature(bool on) {
+    setState(() {
+      _hasTemperature = on;
+      if (on && _tempChoices.isEmpty) {
+        // The cafe's standard temperature choices
+        _tempChoices.add(TextEditingController(text: 'Standard'));
+        _tempChoices.add(TextEditingController(text: 'Extra Hot'));
+      }
+    });
+  }
+
+  void _toggleMilk(bool on) {
+    setState(() {
+      _hasMilk = on;
+      if (on && _milks.isEmpty) {
+        // The cafe's standard milk choices
+        _milks.add(_MilkDraft(name: 'Full Fat Milk'));
+        _milks.add(_MilkDraft(name: 'Lactose Free'));
+        _milks.add(_MilkDraft(name: 'Coconut Milk', extra: 5));
+        _milks.add(_MilkDraft(name: 'Almond Milk', extra: 5));
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final cats =
+        ref.watch(categoriesProvider).valueOrNull ?? const <Category>[];
+    final selectedCat = _selectedCategory(cats);
+    final isDrink = _isDrink(selectedCat);
+    final isHot = _isHotDrink(selectedCat);
+
     return Container(
       decoration: const BoxDecoration(
         color: HamsaColors.bgSurface,
@@ -502,24 +608,193 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
               );
             }),
             const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: HamsaInput(
-                    label: 'Price (SAR)',
-                    controller: _priceCtrl,
-                    keyboardType:
-                        const TextInputType.numberWithOptions(decimal: true),
+
+            // ── Category ────────────────────────────────────────
+            Text(
+              'Category',
+              style: HamsaText.body(
+                  size: 14,
+                  weight: FontWeight.w600,
+                  color: HamsaColors.cream),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Drinks can have milk options; hot drinks can also have temperature options.',
+              style: HamsaText.body(size: 11, color: HamsaColors.muted),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: cats
+                  .map(
+                    (c) => _FilterChip(
+                      label: c.nameEn,
+                      selected: _selectedCategoryId == c.id,
+                      onTap: () =>
+                          setState(() => _selectedCategoryId = c.id),
+                    ),
+                  )
+                  .toList(),
+            ),
+            const SizedBox(height: 20),
+
+            // ── Temperature options (hot drinks only) ───────────
+            if (isHot) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Temperature Options',
+                    style: HamsaText.body(
+                        size: 14,
+                        weight: FontWeight.w600,
+                        color: HamsaColors.cream),
                   ),
+                  Switch(
+                    value: _hasTemperature,
+                    onChanged: _toggleTemperature,
+                    activeThumbColor: HamsaColors.greenAccent,
+                  ),
+                ],
+              ),
+              if (_hasTemperature) ...[
+                Text(
+                  'Customers must pick one when ordering.',
+                  style: HamsaText.body(size: 11, color: HamsaColors.muted),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: HamsaInput(
-                    label: 'Category ID',
-                    controller: _catIdCtrl,
+                const SizedBox(height: 12),
+                ..._tempChoices.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: HamsaInput(
+                            label: 'Temperature choice',
+                            controller: entry.value,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              color: HamsaColors.error, size: 20),
+                          onPressed: () => setState(() {
+                            _tempChoices.removeAt(i).dispose();
+                          }),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                GestureDetector(
+                  onTap: () => setState(
+                      () => _tempChoices.add(TextEditingController())),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.add_rounded,
+                          color: HamsaColors.greenAccent, size: 18),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Add temperature choice',
+                        style: HamsaText.body(
+                            size: 13, color: HamsaColors.greenAccent),
+                      ),
+                    ],
                   ),
                 ),
               ],
+              const SizedBox(height: 20),
+            ],
+
+            // ── Milk options (all drinks) ────────────────────────
+            if (isDrink) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    'Milk Options',
+                    style: HamsaText.body(
+                        size: 14,
+                        weight: FontWeight.w600,
+                        color: HamsaColors.cream),
+                  ),
+                  Switch(
+                    value: _hasMilk,
+                    onChanged: _toggleMilk,
+                    activeThumbColor: HamsaColors.greenAccent,
+                  ),
+                ],
+              ),
+              if (_hasMilk) ...[
+                Text(
+                  'Customers must pick one when ordering. '
+                  'Extra SAR is added on top of the item price.',
+                  style: HamsaText.body(size: 11, color: HamsaColors.muted),
+                ),
+                const SizedBox(height: 12),
+                ..._milks.asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final milk = entry.value;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          flex: 3,
+                          child: HamsaInput(
+                            label: 'Milk type',
+                            controller: milk.nameCtrl,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          flex: 2,
+                          child: HamsaInput(
+                            label: 'Extra SAR',
+                            controller: milk.extraCtrl,
+                            keyboardType:
+                                const TextInputType.numberWithOptions(
+                                    decimal: true),
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline_rounded,
+                              color: HamsaColors.error, size: 20),
+                          onPressed: () => setState(() {
+                            _milks.removeAt(i).dispose();
+                          }),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+                GestureDetector(
+                  onTap: () => setState(() => _milks.add(_MilkDraft())),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.add_rounded,
+                          color: HamsaColors.greenAccent, size: 18),
+                      const SizedBox(width: 4),
+                      Text(
+                        'Add milk type',
+                        style: HamsaText.body(
+                            size: 13, color: HamsaColors.greenAccent),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+              const SizedBox(height: 20),
+            ],
+
+            HamsaInput(
+              label: 'Price (SAR)',
+              controller: _priceCtrl,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
             ),
             const SizedBox(height: 16),
 
@@ -544,15 +819,89 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
             HamsaButton(
               label: widget.existing == null ? 'Add to Menu' : 'Save Changes',
               isLoading: _saving,
-              onTap: _saving ? null : _save,
+              onTap: _saving ? null : () => _save(cats),
             ),
+
+            if (widget.existing != null && widget.onDelete != null) ...[
+              const SizedBox(height: 12),
+              Center(
+                child: TextButton.icon(
+                  onPressed: _saving ? null : _confirmDelete,
+                  icon: const Icon(Icons.delete_outline_rounded,
+                      color: HamsaColors.error, size: 18),
+                  label: Text(
+                    'Remove from Menu',
+                    style:
+                        HamsaText.body(size: 13, color: HamsaColors.error),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
   }
 
-  Future<void> _save() async {
+  /// Builds the options list from the form state. Sections that are hidden
+  /// (wrong category type) or toggled off are simply omitted, which removes
+  /// them from the database on save.
+  List<Map<String, dynamic>> _buildOptions(List<Category> cats) {
+    final cat = _selectedCategory(cats);
+    final options = <Map<String, dynamic>>[];
+
+    if (_isHotDrink(cat) && _hasTemperature) {
+      final choices = [
+        for (final t in _tempChoices)
+          if (t.text.trim().isNotEmpty) t.text.trim(),
+      ];
+      if (choices.isNotEmpty) {
+        options.add({
+          'name': _tempOption,
+          'choices': choices,
+          'required': true,
+          'price_modifiers': <String, double>{},
+        });
+      }
+    }
+
+    if (_isDrink(cat) && _hasMilk) {
+      final choices = <String>[];
+      final modifiers = <String, double>{};
+      for (final m in _milks) {
+        final name = m.nameCtrl.text.trim();
+        if (name.isEmpty) continue;
+        final extra = double.tryParse(m.extraCtrl.text.trim()) ?? 0;
+        // Surcharge goes into the label so customers see it on the chip,
+        // and into price_modifiers so it's added to the price.
+        final label = extra > 0
+            ? '$name (+${extra % 1 == 0 ? extra.toStringAsFixed(0) : extra.toStringAsFixed(2)} SAR)'
+            : name;
+        choices.add(label);
+        if (extra > 0) modifiers[label] = extra;
+      }
+      if (choices.isNotEmpty) {
+        options.add({
+          'name': _milkOption,
+          'choices': choices,
+          'required': true,
+          'price_modifiers': modifiers,
+        });
+      }
+    }
+
+    // Keep any other configured options (e.g. Size) untouched.
+    options.addAll(_otherOptions.map((o) => o.toJson()));
+    return options;
+  }
+
+  Future<void> _save(List<Category> cats) async {
+    if (_selectedCategoryId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please choose a category')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       await widget.onSave({
@@ -570,8 +919,9 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
               },
         ],
         'price': double.tryParse(_priceCtrl.text) ?? 0,
-        'category_id': _catIdCtrl.text.trim(),
+        'category_id': _selectedCategoryId,
         'available': _available,
+        'options': _buildOptions(cats),
       });
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
@@ -583,6 +933,74 @@ class _ItemFormSheetState extends State<_ItemFormSheet> {
     } finally {
       if (mounted) setState(() => _saving = false);
     }
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: HamsaColors.bgCard,
+        title: Text(
+          'Remove item?',
+          style: HamsaText.heading(size: 18, color: HamsaColors.cream),
+        ),
+        content: Text(
+          '"${widget.existing!.nameEn}" will be permanently removed from the menu.',
+          style: HamsaText.body(size: 14, color: HamsaColors.offWhite),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: Text(
+              'Cancel',
+              style: HamsaText.body(size: 14, color: HamsaColors.muted),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              'Remove',
+              style: HamsaText.body(size: 14, color: HamsaColors.error),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    setState(() => _saving = true);
+    try {
+      await widget.onDelete!();
+      if (mounted) Navigator.of(context).pop();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+}
+
+// ─── Editable milk option row holder ─────────────────────────
+class _MilkDraft {
+  final TextEditingController nameCtrl;
+  final TextEditingController extraCtrl;
+
+  _MilkDraft({String name = '', double extra = 0})
+      : nameCtrl = TextEditingController(text: name),
+        extraCtrl = TextEditingController(
+            text: extra == 0
+                ? ''
+                : extra % 1 == 0
+                    ? extra.toStringAsFixed(0)
+                    : extra.toString());
+
+  void dispose() {
+    nameCtrl.dispose();
+    extraCtrl.dispose();
   }
 }
 

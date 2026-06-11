@@ -162,7 +162,7 @@ class _HistoryCard extends StatelessWidget {
                 children: [
                   const SizedBox(height: 12),
                   Text(
-                    '#${order.id.substring(0, 8).toUpperCase()}',
+                    '#${order.displayNumber}',
                     style: HamsaText.body(
                       size: 13,
                       weight: FontWeight.w600,
