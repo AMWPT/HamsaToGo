@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Query
 from models.order import OrderCreate, OrderStatusUpdate, OrderResponse, OrderStatus
 from services import firestore as db
+from services import postgres as pg
 from services.fcm import notify_order_ready, notify_order_received
 from typing import List, Optional
 
@@ -34,8 +35,12 @@ def place_order(order: OrderCreate):
                 detail=f"'{item.name_en}' is currently unavailable."
             )
 
-    # Create the order
+    # Create the order in Firestore
     data = db.create_order(order.model_dump())
+
+    # Sync to PostgreSQL
+    pg.insert_order(data)
+    pg.insert_order_items(data["id"], data.get("items", []))
 
     # Notify customer that order was received
     notify_order_received(
@@ -121,6 +126,9 @@ def update_order_status(order_id: str, update: OrderStatusUpdate):
 
     # Update in Firestore
     updated = db.update_order_status(order_id, update.status.value)
+
+    # Sync status to PostgreSQL
+    pg.update_order_status(order_id, update.status.value)
 
     # Send push notification when order is ready
     if update.status == OrderStatus.READY:

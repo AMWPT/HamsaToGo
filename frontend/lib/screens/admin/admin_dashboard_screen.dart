@@ -168,13 +168,6 @@ class _AdminDashboardScreenState
         ],
       ),
 
-      // Refresh FAB
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: HamsaColors.greenAccent,
-        onPressed: () => ref.invalidate(activeOrdersProvider),
-        child: const Icon(Icons.refresh_rounded,
-            color: HamsaColors.bgDeep),
-      ),
     );
   }
 }
@@ -408,7 +401,7 @@ class AdminOrderCard extends ConsumerWidget {
     final api = ref.read(apiServiceProvider);
     try {
       await api.updateOrderStatus(order.id, next);
-      ref.invalidate(activeOrdersProvider);
+      // Stream auto-updates — no manual refresh needed
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

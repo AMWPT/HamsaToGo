@@ -1,31 +1,56 @@
+import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/order.dart';
 import 'auth_provider.dart';
 
-// Customer: my orders
-final myOrdersProvider = FutureProvider<List<Order>>((ref) async {
-  final api = ref.watch(apiServiceProvider);
-  final auth = ref.watch(authProvider);
-  final userId = auth.user?.id;
-  if (userId == null) return [];
-  return api.getCustomerOrders(userId);
+final _fs = FirebaseFirestore.instance;
+
+// Customer: my orders — real-time stream
+final myOrdersProvider = StreamProvider<List<Order>>((ref) {
+  final userId = ref.watch(authProvider).user?.id;
+  if (userId == null) return const Stream.empty();
+  return _fs
+      .collection('orders')
+      .where('customer_id', isEqualTo: userId)
+      .snapshots()
+      .map((snap) {
+    final orders = snap.docs.map((d) => Order.fromFirestore(d)).toList();
+    orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return orders;
+  });
 });
 
-// Admin: active queue (received + in_progress)
-final activeOrdersProvider = FutureProvider<List<Order>>((ref) async {
-  final api = ref.watch(apiServiceProvider);
-  return api.getActiveOrders();
+// Admin: active queue (received + in_progress) — real-time stream
+final activeOrdersProvider = StreamProvider<List<Order>>((ref) {
+  return _fs
+      .collection('orders')
+      .where('status', whereIn: ['received', 'in_progress'])
+      .snapshots()
+      .map((snap) {
+    final orders = snap.docs.map((d) => Order.fromFirestore(d)).toList();
+    orders.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+    return orders;
+  });
 });
 
-// Admin: all orders (for history)
-final allOrdersProvider = FutureProvider<List<Order>>((ref) async {
-  final api = ref.watch(apiServiceProvider);
-  return api.getAllOrders();
+// Admin: all orders — real-time stream
+final allOrdersProvider = StreamProvider<List<Order>>((ref) {
+  return _fs
+      .collection('orders')
+      .snapshots()
+      .map((snap) {
+    final orders = snap.docs.map((d) => Order.fromFirestore(d)).toList();
+    orders.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return orders;
+  });
 });
 
-// Single order refresh
-final singleOrderProvider =
-    FutureProvider.family<Order, String>((ref, orderId) async {
-  final api = ref.watch(apiServiceProvider);
-  return api.getOrder(orderId);
+// Single order — real-time stream
+final singleOrderProvider = StreamProvider.family<Order, String>((ref, orderId) {
+  return _fs
+      .collection('orders')
+      .doc(orderId)
+      .snapshots()
+      .where((snap) => snap.exists)
+      .map((snap) => Order.fromFirestore(snap));
 });

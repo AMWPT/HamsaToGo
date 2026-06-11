@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException, status
 from firebase_admin import auth as firebase_auth
 from models.user import PhoneVerifyRequest, UserUpdate, UserResponse, AdminLogin, AdminPhoneVerify
 from services import firestore as db
+from services import postgres as pg
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -45,6 +46,9 @@ def phone_verify(data: PhoneVerifyRequest):
             "full_name": data.full_name.strip(),
             "fcm_token": None,
         })
+
+    # Sync to PostgreSQL (upsert — safe to call on every login too)
+    pg.upsert_customer(uid, user_data.get("phone", ""), user_data.get("full_name", ""))
 
     return {"user": user_data, "token": data.id_token}
 

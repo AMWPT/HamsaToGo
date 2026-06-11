@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
+import '../services/fcm_service.dart';
 import '../core/constants.dart';
 
 final apiServiceProvider = Provider<ApiService>((ref) => ApiService());
@@ -85,6 +86,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       state = AuthState(user: user);
+      // Register FCM token so push notifications reach this device
+      FcmService.registerToken(_api, user.id);
     } catch (e) {
       state = state.copyWith(isLoading: false, error: _parseError(e));
     }

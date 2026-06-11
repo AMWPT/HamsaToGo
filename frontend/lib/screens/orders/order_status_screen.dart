@@ -32,13 +32,6 @@ class OrderStatusScreen extends ConsumerWidget {
           isAr ? 'حالة الطلب' : 'Order Status',
           style: HamsaText.heading(size: 18, color: HamsaColors.cream),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded,
-                color: HamsaColors.muted, size: 20),
-            onPressed: () => ref.invalidate(singleOrderProvider(orderId)),
-          ),
-        ],
       ),
       body: orderAsync.when(
         data: (order) => _OrderStatusBody(
@@ -47,9 +40,9 @@ class OrderStatusScreen extends ConsumerWidget {
           child: CircularProgressIndicator(
               color: HamsaColors.greenAccent),
         ),
-        error: (_, __) => Center(
+        error: (err, _) => Center(
           child: Text(
-            isAr ? 'خطأ في تحميل الطلب' : 'Error loading order',
+            'Error: $err',
             style: HamsaText.body(color: HamsaColors.muted),
           ),
         ),

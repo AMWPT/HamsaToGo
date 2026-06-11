@@ -7,24 +7,25 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme.dart';
 import 'core/router.dart';
 import 'providers/locale_provider.dart';
+import 'services/fcm_service.dart';
+
+final navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
         .timeout(const Duration(seconds: 5));
+    await FcmService.initialize(navigatorKey: navigatorKey);
   } catch (e) {
-    // Already initialized, timeout, or config error — continue anyway
     debugPrint('Firebase init: $e');
   }
 
-  // Force portrait orientation
   SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
   ]);
 
-  // Status bar style
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,

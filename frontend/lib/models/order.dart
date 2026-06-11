@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum OrderStatus {
   received,
   inProgress,
@@ -114,9 +116,9 @@ class OrderItemModel {
         nameEn: json['name_en'] as String,
         nameAr: json['name_ar'] as String,
         quantity: (json['quantity'] as num).toInt(),
-        unitPrice: (json['unit_price'] as num).toDouble(),
+        unitPrice: (json['price'] as num).toDouble(),
         selectedOptions: Map<String, String>.from(
-            json['selected_options'] as Map<dynamic, dynamic>? ?? {}),
+            json['customizations'] as Map<dynamic, dynamic>? ?? {}),
         notes: json['notes'] as String?,
       );
 
@@ -125,8 +127,8 @@ class OrderItemModel {
         'name_en': nameEn,
         'name_ar': nameAr,
         'quantity': quantity,
-        'unit_price': unitPrice,
-        'selected_options': selectedOptions,
+        'price': unitPrice,
+        'customizations': selectedOptions,
         if (notes != null) 'notes': notes,
       };
 }
@@ -166,6 +168,28 @@ class Order {
             ? DateTime.tryParse(json['updated_at'] as String)
             : null,
       );
+
+  factory Order.fromFirestore(DocumentSnapshot doc) {
+    final json = doc.data() as Map<String, dynamic>;
+    DateTime parseTs(dynamic v) {
+      if (v is Timestamp) return v.toDate();
+      if (v is String) return DateTime.parse(v);
+      return DateTime.now();
+    }
+
+    return Order(
+      id: doc.id,
+      customerId: json['customer_id'] as String,
+      items: (json['items'] as List<dynamic>)
+          .map((i) => OrderItemModel.fromJson(i as Map<String, dynamic>))
+          .toList(),
+      totalPrice: (json['total_price'] as num).toDouble(),
+      status: OrderStatus.fromString(json['status'] as String),
+      notes: json['notes'] as String?,
+      createdAt: parseTs(json['created_at']),
+      updatedAt: json['updated_at'] != null ? parseTs(json['updated_at']) : null,
+    );
+  }
 }
 
 /// Cart item (before submitting order)

@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 
 from firebase.config import init_firebase
+from services.postgres import init_db
 from routes import auth, menu, orders, notifications
 
 load_dotenv()
@@ -16,6 +17,8 @@ async def lifespan(app: FastAPI):
     print("[*] Initializing Firebase...")
     init_firebase()
     print("[OK] Firebase ready.")
+    print("[*] Initializing PostgreSQL...")
+    init_db()
     yield
     print("[*] Shutting down Hamsa Backend.")
 

@@ -30,6 +30,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       final api = ref.read(apiServiceProvider);
       final order = await api.placeOrder(
         customerId: auth.user!.id,
+        customerName: auth.user!.fullName,
         items: cart,
       );
       ref.read(cartProvider.notifier).clear();

@@ -122,14 +122,14 @@ class ApiService {
 
   Future<Order> placeOrder({
     required String customerId,
+    required String customerName,
     required List<CartItem> items,
     String? notes,
   }) async {
     final res = await _dio.post('/orders/', data: {
       'customer_id': customerId,
+      'customer_name': customerName,
       'items': items.map((i) => i.toOrderItem().toJson()).toList(),
-      'total_price':
-          items.fold(0.0, (sum, i) => sum + i.subtotal),
       if (notes != null) 'notes': notes,
     });
     return Order.fromJson(res.data as Map<String, dynamic>);
@@ -174,9 +174,9 @@ class ApiService {
 
   // ─── Notifications ─────────────────────────────────────────
 
-  Future<void> saveFcmToken(String customerId, String token) async {
+  Future<void> saveFcmToken({required String userId, required String token}) async {
     await _dio.post('/notifications/token', data: {
-      'customer_id': customerId,
+      'customer_id': userId,
       'fcm_token': token,
     });
   }
