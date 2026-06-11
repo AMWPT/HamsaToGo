@@ -20,11 +20,11 @@ final myOrdersProvider = StreamProvider<List<Order>>((ref) {
   });
 });
 
-// Admin: active queue (received + in_progress) — real-time stream
+// Admin: active queue (received + in_progress + ready) — real-time stream
 final activeOrdersProvider = StreamProvider<List<Order>>((ref) {
   return _fs
       .collection('orders')
-      .where('status', whereIn: ['received', 'in_progress'])
+      .where('status', whereIn: ['received', 'in_progress', 'ready'])
       .snapshots()
       .map((snap) {
     final orders = snap.docs.map((d) => Order.fromFirestore(d)).toList();

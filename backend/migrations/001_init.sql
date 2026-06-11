@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS customers (
 -- ─── orders ───────────────────────────────────────────────────
 CREATE TABLE IF NOT EXISTS orders (
     id              VARCHAR(128) PRIMARY KEY,   -- Firestore doc ID
+    order_number    BIGINT,                     -- sequential, 1-based (counters/orders in Firestore)
     customer_id     VARCHAR(128)    NOT NULL REFERENCES customers(id),
     customer_name   VARCHAR(200)    NOT NULL,
     status          VARCHAR(20)     NOT NULL DEFAULT 'received',
@@ -29,9 +30,14 @@ CREATE TABLE IF NOT EXISTS orders (
     picked_up_at    TIMESTAMP WITH TIME ZONE
 );
 
+-- Existing databases created before order_number was added
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_number BIGINT;
+
 CREATE INDEX IF NOT EXISTS idx_orders_customer_id  ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status        ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_created_at    ON orders(created_at);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_order_number
+    ON orders(order_number) WHERE order_number IS NOT NULL;
 
 
 -- ─── order_items ──────────────────────────────────────────────

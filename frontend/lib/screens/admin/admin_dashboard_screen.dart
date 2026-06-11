@@ -6,6 +6,7 @@ import '../../core/theme.dart';
 import '../../core/router.dart';
 import '../../models/order.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../providers/order_provider.dart';
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
@@ -183,6 +184,8 @@ class _StatsRow extends StatelessWidget {
         orders.where((o) => o.status == OrderStatus.received).length;
     final inProgress =
         orders.where((o) => o.status == OrderStatus.inProgress).length;
+    final ready =
+        orders.where((o) => o.status == OrderStatus.ready).length;
     final total = orders.length;
 
     return Padding(
@@ -199,9 +202,17 @@ class _StatsRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: _StatChip(
-              label: 'In Progress',
+              label: 'Preparing',
               value: '$inProgress',
               color: HamsaColors.statusInProgress,
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: _StatChip(
+              label: 'Ready',
+              value: '$ready',
+              color: HamsaColors.statusReady,
             ),
           ),
           const SizedBox(width: 10),
@@ -269,6 +280,7 @@ class AdminOrderCard extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isAr = ref.watch(localeProvider).languageCode == 'ar';
     final status = order.status;
 
     final statusColor = switch (status) {
@@ -317,7 +329,7 @@ class AdminOrderCard extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '#${order.id.substring(0, 8).toUpperCase()}',
+                            '#${order.displayNumber}',
                             style: HamsaText.body(
                               size: 13,
                               weight: FontWeight.w700,
@@ -341,12 +353,15 @@ class AdminOrderCard extends ConsumerWidget {
                               borderRadius: BorderRadius.circular(100),
                             ),
                             child: Text(
-                              status.labelEn(),
+                              status.label(isAr),
                               style: HamsaText.body(
                                 size: 10,
                                 color: statusColor,
                                 weight: FontWeight.w600,
                               ),
+                              textDirection: isAr
+                                  ? TextDirection.rtl
+                                  : TextDirection.ltr,
                             ),
                           ),
                         ],
@@ -367,12 +382,15 @@ class AdminOrderCard extends ConsumerWidget {
                                 color: statusColor.withValues(alpha: 0.4)),
                           ),
                           child: Text(
-                            _nextLabel(nextStatus),
+                            _nextLabel(nextStatus, isAr),
                             style: HamsaText.body(
                               size: 11,
                               weight: FontWeight.w700,
                               color: statusColor,
                             ),
+                            textDirection: isAr
+                                ? TextDirection.rtl
+                                : TextDirection.ltr,
                           ),
                         ),
                       ),
@@ -414,11 +432,13 @@ class AdminOrderCard extends ConsumerWidget {
     }
   }
 
-  String _nextLabel(OrderStatus s) => switch (s) {
-        OrderStatus.received => 'Accept',
-        OrderStatus.inProgress => 'Mark Ready',
-        OrderStatus.ready => 'Picked Up',
-        OrderStatus.pickedUp => 'Done',
+  // Action labels — worded as the action that moves the order to `next`,
+  // so they can't be mistaken for the order's current status.
+  String _nextLabel(OrderStatus next, bool isAr) => switch (next) {
+        OrderStatus.received => isAr ? 'تقديم' : 'Place',
+        OrderStatus.inProgress => isAr ? 'بدء التحضير' : 'Start Preparing',
+        OrderStatus.ready => isAr ? 'تأكيد الجاهزية' : 'Mark Ready',
+        OrderStatus.pickedUp => isAr ? 'تأكيد الاستلام' : 'Mark Picked Up',
       };
 }
 

@@ -111,8 +111,8 @@ def upsert_customer(uid: str, phone: str, full_name: str) -> None:
 def insert_order(order_data: dict) -> None:
     """
     Write a new order row. Called right after Firestore create.
-    order_data keys: id, customer_id, customer_name, status,
-                     total_price, notes, created_at
+    order_data keys: id, order_number, customer_id, customer_name,
+                     status, total_price, notes, created_at
     """
     conn = _get_conn()
     if not conn:
@@ -122,13 +122,14 @@ def insert_order(order_data: dict) -> None:
             cur.execute(
                 """
                 INSERT INTO orders
-                    (id, customer_id, customer_name, status,
+                    (id, order_number, customer_id, customer_name, status,
                      total_price, notes, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO NOTHING
                 """,
                 (
                     order_data["id"],
+                    order_data.get("order_number"),
                     order_data["customer_id"],
                     order_data.get("customer_name", ""),
                     order_data.get("status", "received"),

@@ -8,6 +8,7 @@ import '../../models/order.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../widgets/hamsa_button.dart';
+import '../../widgets/order_progress_timeline.dart';
 
 class OrderStatusScreen extends ConsumerWidget {
   final String orderId;
@@ -85,7 +86,7 @@ class _OrderStatusBody extends StatelessWidget {
           const SizedBox(height: 40),
 
           // Progress timeline
-          _ProgressTimeline(currentStatus: status, isAr: isAr)
+          OrderProgressTimeline(currentStatus: status, isAr: isAr)
               .animate(delay: 200.ms)
               .fadeIn(duration: 400.ms),
 
@@ -109,7 +110,7 @@ class _OrderStatusBody extends StatelessWidget {
                       size: 13, color: HamsaColors.muted),
                 ),
                 Text(
-                  '#${order.id.substring(0, 8).toUpperCase()}',
+                  '#${order.displayNumber}',
                   style: HamsaText.body(
                     size: 14,
                     weight: FontWeight.w700,
@@ -249,124 +250,6 @@ class _StatusHero extends StatelessWidget {
       OrderStatus.inProgress => 'Your order is being prepared',
       OrderStatus.ready => 'Ready at the counter — come pick it up!',
       OrderStatus.pickedUp => 'Enjoyed! Thanks for visiting Hamsa.',
-    };
-  }
-}
-
-// ─── Progress Timeline ───────────────────────────────────────
-class _ProgressTimeline extends StatelessWidget {
-  final OrderStatus currentStatus;
-  final bool isAr;
-
-  const _ProgressTimeline({
-    required this.currentStatus,
-    required this.isAr,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final steps = [
-      OrderStatus.received,
-      OrderStatus.inProgress,
-      OrderStatus.ready,
-      OrderStatus.pickedUp,
-    ];
-
-    return Row(
-      textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
-      children: steps.asMap().entries.map((entry) {
-        final i = entry.key;
-        final step = entry.value;
-        final isDone = step.step <= currentStatus.step;
-        final isActive = step == currentStatus;
-
-        return Expanded(
-          child: Row(
-            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
-            children: [
-              // Dot
-              Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  AnimatedContainer(
-                    duration: const Duration(milliseconds: 300),
-                    width: isActive ? 18 : 14,
-                    height: isActive ? 18 : 14,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: isDone
-                          ? HamsaColors.greenAccent
-                          : HamsaColors.bgElevated,
-                      border: Border.all(
-                        color: isDone
-                            ? HamsaColors.greenAccent
-                            : HamsaColors.borderStrong,
-                        width: isActive ? 3 : 1.5,
-                      ),
-                      boxShadow: isActive
-                          ? [
-                              BoxShadow(
-                                color: HamsaColors.greenAccent
-                                    .withValues(alpha: 0.5),
-                                blurRadius: 12,
-                                spreadRadius: 2,
-                              ),
-                            ]
-                          : null,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    _shortLabel(step, isAr),
-                    style: HamsaText.body(
-                      size: 9,
-                      color: isDone
-                          ? HamsaColors.greenAccent
-                          : HamsaColors.subtle,
-                      weight: isActive
-                          ? FontWeight.w700
-                          : FontWeight.w400,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-
-              // Connector line (not on last)
-              if (i < steps.length - 1)
-                Expanded(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 22),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      height: 2,
-                      color: step.step < currentStatus.step
-                          ? HamsaColors.greenAccent
-                          : HamsaColors.border,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  String _shortLabel(OrderStatus s, bool isAr) {
-    if (isAr) {
-      return switch (s) {
-        OrderStatus.received => 'استُلم',
-        OrderStatus.inProgress => 'جارٍ',
-        OrderStatus.ready => 'جاهز',
-        OrderStatus.pickedUp => 'مُستلم',
-      };
-    }
-    return switch (s) {
-      OrderStatus.received => 'Received',
-      OrderStatus.inProgress => 'Making',
-      OrderStatus.ready => 'Ready',
-      OrderStatus.pickedUp => 'Done',
     };
   }
 }

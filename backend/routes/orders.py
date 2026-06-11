@@ -55,11 +55,11 @@ def place_order(order: OrderCreate):
 @router.get("/", response_model=List[OrderResponse])
 def get_orders(
     status: Optional[str] = Query(None, description="Filter by status"),
-    active_only: bool = Query(False, description="Show only received + in_progress"),
+    active_only: bool = Query(False, description="Show only received + in_progress + ready"),
 ):
     """
     Admin: Get all orders.
-    - active_only=true → only 'received' and 'in_progress' (the live queue)
+    - active_only=true → only 'received', 'in_progress' and 'ready' (the live queue)
     - status=received  → filter by specific status
     """
     if active_only:

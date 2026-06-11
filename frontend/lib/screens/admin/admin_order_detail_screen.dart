@@ -5,8 +5,10 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../models/order.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../widgets/hamsa_button.dart';
+import '../../widgets/order_progress_timeline.dart';
 
 class AdminOrderDetailScreen extends ConsumerWidget {
   final String orderId;
@@ -50,6 +52,7 @@ class _Body extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final isAr = ref.watch(localeProvider).languageCode == 'ar';
     final status = order.status;
     final nextStatus = status.next;
 
@@ -86,7 +89,7 @@ class _Body extends ConsumerWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '#${order.id.substring(0, 8).toUpperCase()}',
+                            '#${order.displayNumber}',
                             style: HamsaText.heading(
                                 size: 22, color: HamsaColors.cream),
                           ),
@@ -108,18 +111,27 @@ class _Body extends ConsumerWidget {
                               color: statusColor.withValues(alpha: 0.5)),
                         ),
                         child: Text(
-                          status.labelEn(),
+                          status.label(isAr),
                           style: HamsaText.body(
                             size: 13,
                             color: statusColor,
                             weight: FontWeight.w700,
                           ),
+                          textDirection:
+                              isAr ? TextDirection.rtl : TextDirection.ltr,
                         ),
                       ),
                     ],
                   ),
                 )
                     .animate()
+                    .fadeIn(duration: 400.ms),
+
+                const SizedBox(height: 24),
+
+                // Progress timeline — same 4 phases the customer sees
+                OrderProgressTimeline(currentStatus: status, isAr: isAr)
+                    .animate(delay: 100.ms)
                     .fadeIn(duration: 400.ms),
 
                 const SizedBox(height: 24),
@@ -209,7 +221,7 @@ class _Body extends ConsumerWidget {
               border: Border(top: BorderSide(color: HamsaColors.border)),
             ),
             child: HamsaButton(
-              label: _actionLabel(nextStatus),
+              label: _actionLabel(nextStatus, isAr),
               onTap: () => _advance(context, ref, nextStatus),
               style: nextStatus == OrderStatus.ready
                   ? HamsaButtonStyle.gold
@@ -225,9 +237,8 @@ class _Body extends ConsumerWidget {
     final api = ref.read(apiServiceProvider);
     try {
       await api.updateOrderStatus(order.id, next);
-      ref.invalidate(activeOrdersProvider);
-      ref.invalidate(singleOrderProvider(order.id));
-      if (context.mounted) context.pop();
+      // Streams auto-update — stay on this screen so staff can
+      // watch the timeline advance and press the next step.
     } catch (e) {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -237,11 +248,17 @@ class _Body extends ConsumerWidget {
     }
   }
 
-  String _actionLabel(OrderStatus s) => switch (s) {
-        OrderStatus.received => 'Accept Order',
-        OrderStatus.inProgress => 'Mark as Ready',
-        OrderStatus.ready => 'Mark as Picked Up',
-        OrderStatus.pickedUp => 'Done',
+  // Action labels — worded as the action that moves the order to `next`,
+  // so they can't be mistaken for the order's current status.
+  String _actionLabel(OrderStatus next, bool isAr) => switch (next) {
+        OrderStatus.received =>
+          isAr ? 'تقديم الطلب' : 'Place Order',
+        OrderStatus.inProgress =>
+          isAr ? 'بدء تحضير الطلب' : 'Start Preparing Order',
+        OrderStatus.ready =>
+          isAr ? 'تأكيد جاهزية الطلب للاستلام' : 'Mark as Ready for Pickup',
+        OrderStatus.pickedUp =>
+          isAr ? 'تأكيد استلام الطلب' : 'Mark as Picked Up',
       };
 
   String _timeAgo(DateTime dt) {

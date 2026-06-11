@@ -1,5 +1,6 @@
 from firebase.config import get_firestore
 from datetime import datetime, timezone
+from google.cloud import firestore as gcf
 
 
 # ─── Collections ─────────────────────────────────────────────
@@ -7,6 +8,7 @@ USERS       = "users"
 CATEGORIES  = "categories"
 MENU_ITEMS  = "menu_items"
 ORDERS      = "orders"
+COUNTERS    = "counters"
 
 
 def now() -> datetime:
@@ -135,11 +137,30 @@ def delete_menu_item(item_id: str):
 
 
 # ─── Orders ──────────────────────────────────────────────────
+def _next_order_number(db) -> int:
+    """
+    Atomically allocate the next sequential order number (1, 2, 3, …)
+    using a transaction on the counters/orders document, so two orders
+    placed at the same moment can never get the same number.
+    """
+    counter_ref = db.collection(COUNTERS).document("orders")
+
+    @gcf.transactional
+    def _increment(tx):
+        snap = counter_ref.get(transaction=tx)
+        current = (snap.to_dict() or {}).get("current", 0) if snap.exists else 0
+        tx.set(counter_ref, {"current": current + 1})
+        return current + 1
+
+    return _increment(db.transaction())
+
+
 def create_order(data: dict) -> dict:
     db = get_firestore()
-    data["status"]     = "received"
-    data["created_at"] = now()
-    data["updated_at"] = now()
+    data["status"]       = "received"
+    data["order_number"] = _next_order_number(db)
+    data["created_at"]   = now()
+    data["updated_at"]   = now()
 
     # Calculate total price
     data["total_price"] = sum(
@@ -168,10 +189,10 @@ def get_all_orders(status: str = None) -> list:
 
 
 def get_active_orders() -> list:
-    """Orders the employee needs to action (received + in_progress)."""
+    """Orders the employee needs to action (received + in_progress + ready)."""
     db = get_firestore()
     results = []
-    for status in ["received", "in_progress"]:
+    for status in ["received", "in_progress", "ready"]:
         docs = db.collection(ORDERS).where("status", "==", status).stream()
         results.extend([doc_to_dict(d) for d in docs])
     results.sort(key=lambda x: x.get("created_at", ""))

@@ -163,7 +163,7 @@ class OrderTimelineCard extends StatelessWidget {
                           : CrossAxisAlignment.start,
                       children: [
                         Text(
-                          '${isAr ? "طلب" : "Order"} #${order.id.substring(0, 8).toUpperCase()}',
+                          '${isAr ? "طلب" : "Order"} #${order.displayNumber}',
                           style: HamsaText.body(
                             size: 13,
                             weight: FontWeight.w600,
