@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/api_service.dart';
 import '../services/fcm_service.dart';
@@ -73,9 +74,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     state = state.copyWith(isLoading: true, error: null);
     try {
+      // Send the device's chosen language so order notifications are localized.
+      final prefs = await SharedPreferences.getInstance();
+      final lang = prefs.getString(StorageKeys.locale) ?? 'en';
       final data = await _api.phoneVerify(
         idToken: idToken,
         fullName: fullName,
+        lang: lang,
       );
       final user = UserModel.fromJson(data['user'] as Map<String, dynamic>);
       final token = data['token'] as String?;
@@ -131,9 +136,46 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Persist the customer's language choice so order notifications match it.
+  /// Best-effort — a failure here shouldn't disrupt the UI language switch.
+  Future<void> updateLanguage(String lang) async {
+    final user = state.user;
+    if (user == null) return;
+    try {
+      await _api.updateLanguage(user.id, lang);
+      state = state.copyWith(user: UserModel(
+        id: user.id,
+        phone: user.phone,
+        fullName: user.fullName,
+        fcmToken: user.fcmToken,
+        lang: lang,
+        createdAt: user.createdAt,
+      ));
+    } catch (_) {}
+  }
+
   Future<void> logout() async {
     await _storage.deleteAll();
     state = const AuthState();
+  }
+
+  /// Permanently delete the signed-in customer's account, then sign out.
+  /// [idToken] = a freshly-minted Firebase ID token proving ownership.
+  /// Returns true on success; on failure leaves the session intact and
+  /// surfaces the error via state.error.
+  Future<bool> deleteAccount(String idToken) async {
+    final user = state.user;
+    if (user == null) return false;
+    state = state.copyWith(isLoading: true, error: null);
+    try {
+      await _api.deleteAccount(user.id, idToken);
+      await _storage.deleteAll();
+      state = const AuthState();
+      return true;
+    } catch (e) {
+      state = state.copyWith(isLoading: false, error: _parseError(e));
+      return false;
+    }
   }
 
   String _parseError(dynamic e) {

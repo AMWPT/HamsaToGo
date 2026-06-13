@@ -1,5 +1,5 @@
 import os
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, Header, HTTPException, status
 from firebase_admin import auth as firebase_auth
 from models.user import PhoneVerifyRequest, UserUpdate, UserResponse, AdminLogin, AdminPhoneVerify
 from services import firestore as db
@@ -34,6 +34,8 @@ def phone_verify(data: PhoneVerifyRequest):
     # Check Firestore
     user_data = db.get_user(uid)
 
+    lang = data.lang if data.lang in ("en", "ar") else "en"
+
     if not user_data:
         # New user — full_name required
         if not data.full_name or not data.full_name.strip():
@@ -45,7 +47,11 @@ def phone_verify(data: PhoneVerifyRequest):
             "phone": phone,
             "full_name": data.full_name.strip(),
             "fcm_token": None,
+            "lang": lang,
         })
+    elif data.lang and user_data.get("lang") != lang:
+        # Existing user — keep their language preference current
+        user_data = db.update_user(uid, {"lang": lang})
 
     # Sync to PostgreSQL (upsert — safe to call on every login too)
     pg.upsert_customer(uid, user_data.get("phone", ""), user_data.get("full_name", ""))
@@ -64,6 +70,7 @@ def get_user(user_id: str):
         "phone": user.get("phone", ""),
         "full_name": user.get("full_name", ""),
         "fcm_token": user.get("fcm_token"),
+        "lang": user.get("lang", "en"),
         "created_at": str(user["created_at"]) if user.get("created_at") else None,
     }
 
@@ -80,7 +87,57 @@ def update_user(user_id: str, update: UserUpdate):
         "phone": updated.get("phone", ""),
         "full_name": updated.get("full_name", ""),
         "fcm_token": updated.get("fcm_token"),
+        "lang": updated.get("lang", "en"),
     }
+
+
+# ─── Delete Account ───────────────────────────────────────────
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: str, authorization: str = Header(None)):
+    """
+    Permanently delete a customer account.
+    - Requires a valid Firebase ID token whose UID matches user_id, so a
+      user can only delete their own account.
+    - Removes the Firestore profile document.
+    - Removes/anonymizes the PostgreSQL analytics record.
+    - Deletes the Firebase Auth user so they can no longer sign in.
+    """
+    # Authenticate the caller and confirm they own this account
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing authentication token.",
+        )
+    token = authorization.split(" ", 1)[1]
+    try:
+        decoded = firebase_auth.verify_id_token(token, clock_skew_seconds=60)
+    except Exception as e:
+        print(f"[AUTH ERROR] Delete-account token verification failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Invalid token: {str(e)}",
+        )
+    if decoded["uid"] != user_id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You can only delete your own account.",
+        )
+
+    user = db.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # Remove the profile + analytics record
+    db.delete_user(user_id)
+    pg.delete_customer(user_id)
+
+    # Delete the Firebase Auth account (best-effort — may already be gone)
+    try:
+        firebase_auth.delete_user(user_id)
+    except Exception as e:
+        print(f"[AUTH] Firebase delete_user failed for {user_id}: {e}")
+
+    return None
 
 
 # ─── Admin Login ──────────────────────────────────────────────

@@ -51,6 +51,12 @@ def update_user(uid: str, data: dict) -> dict:
     return get_user(uid)
 
 
+def delete_user(uid: str):
+    """Permanently remove a customer's profile document."""
+    db = get_firestore()
+    db.collection(USERS).document(uid).delete()
+
+
 # ─── Categories ──────────────────────────────────────────────
 def create_category(data: dict) -> dict:
     db = get_firestore()
