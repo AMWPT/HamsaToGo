@@ -20,9 +20,13 @@ class ApiService {
     // Auth interceptor — attach token if present
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
-        final token = await _storage.read(key: StorageKeys.authToken);
-        if (token != null) {
-          options.headers['Authorization'] = 'Bearer $token';
+        // Don't overwrite a token explicitly supplied for this request
+        // (e.g. a freshly-minted ID token for account deletion).
+        if (options.headers['Authorization'] == null) {
+          final token = await _storage.read(key: StorageKeys.authToken);
+          if (token != null) {
+            options.headers['Authorization'] = 'Bearer $token';
+          }
         }
         handler.next(options);
       },
@@ -39,17 +43,34 @@ class ApiService {
   Future<Map<String, dynamic>> phoneVerify({
     required String idToken,
     String? fullName,
+    String? lang,
   }) async {
     final res = await _dio.post('/auth/phone-verify', data: {
       'id_token': idToken,
       if (fullName != null) 'full_name': fullName,
+      if (lang != null) 'lang': lang,
     });
     return res.data as Map<String, dynamic>;
+  }
+
+  /// Update the customer's preferred notification language ('en' | 'ar').
+  Future<void> updateLanguage(String userId, String lang) async {
+    await _dio.patch('/auth/users/$userId', data: {'lang': lang});
   }
 
   Future<UserModel> getUser(String userId) async {
     final res = await _dio.get('/auth/users/$userId');
     return UserModel.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  /// Permanently delete the customer's account from the backend.
+  /// [idToken] must be a freshly-minted Firebase ID token; the backend
+  /// verifies it and only allows users to delete their own account.
+  Future<void> deleteAccount(String userId, String idToken) async {
+    await _dio.delete(
+      '/auth/users/$userId',
+      options: Options(headers: {'Authorization': 'Bearer $idToken'}),
+    );
   }
 
   Future<bool> verifyAdmin(String password) async {

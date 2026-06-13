@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,6 +40,171 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
+  // ── Account bottom sheet (sign out + delete account) ─────────
+  Future<void> _showAccountSheet(bool isAr) async {
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: HamsaColors.bgSurface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetCtx) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Grabber
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: HamsaColors.borderStrong,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                Text(
+                  isAr ? 'الحساب' : 'Account',
+                  style: HamsaText.heading(size: 20),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                _AccountSheetTile(
+                  icon: Icons.logout_rounded,
+                  label: isAr ? 'تسجيل الخروج' : 'Sign out',
+                  color: HamsaColors.cream,
+                  onTap: () async {
+                    Navigator.of(sheetCtx).pop();
+                    await ref.read(authProvider.notifier).logout();
+                  },
+                ),
+                const SizedBox(height: 12),
+                _AccountSheetTile(
+                  icon: Icons.delete_outline_rounded,
+                  label: isAr ? 'حذف الحساب' : 'Delete account',
+                  color: HamsaColors.error,
+                  onTap: () async {
+                    Navigator.of(sheetCtx).pop();
+                    await _confirmDeleteAccount(isAr);
+                  },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Future<void> _confirmDeleteAccount(bool isAr) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) {
+        return AlertDialog(
+          backgroundColor: HamsaColors.bgSurface,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            isAr ? 'حذف الحساب؟' : 'Delete account?',
+            style: HamsaText.heading(size: 20),
+            textAlign: isAr ? TextAlign.right : TextAlign.left,
+          ),
+          content: Text(
+            isAr
+                ? 'سيتم حذف حسابك وبياناتك نهائياً. لا يمكن التراجع عن هذا الإجراء.'
+                : 'Your account and personal data will be permanently '
+                    'deleted. This action cannot be undone.',
+            style: HamsaText.body(size: 14, color: HamsaColors.muted),
+            textAlign: isAr ? TextAlign.right : TextAlign.left,
+          ),
+          actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(false),
+              child: Text(
+                isAr ? 'إلغاء' : 'Cancel',
+                style: HamsaText.body(size: 14, color: HamsaColors.cream),
+              ),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(dialogCtx).pop(true),
+              child: Text(
+                isAr ? 'حذف' : 'Delete',
+                style: HamsaText.body(
+                  size: 14,
+                  weight: FontWeight.w700,
+                  color: HamsaColors.error,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) return;
+
+    // Mint a fresh Firebase ID token to prove ownership. The stored token
+    // may be expired, so we force-refresh from the device's Firebase session.
+    String? idToken;
+    final fbUser = FirebaseAuth.instance.currentUser;
+    if (fbUser != null) {
+      try {
+        idToken = await fbUser.getIdToken(true);
+      } catch (_) {
+        idToken = null;
+      }
+    }
+
+    if (!mounted) return;
+    if (idToken == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: HamsaColors.bgElevated,
+          content: Text(
+            isAr
+                ? 'انتهت الجلسة. الرجاء تسجيل الدخول مرة أخرى قبل حذف الحساب.'
+                : 'Your session expired. Please sign in again before '
+                    'deleting your account.',
+            style: HamsaText.body(size: 14, color: HamsaColors.cream),
+          ),
+        ),
+      );
+      return;
+    }
+
+    final ok = await ref.read(authProvider.notifier).deleteAccount(idToken);
+    if (ok) {
+      // Clear the device's Firebase session too (the server account is gone).
+      try {
+        await FirebaseAuth.instance.signOut();
+      } catch (_) {}
+      return; // auth state cleared → router redirects to login
+    }
+
+    if (!mounted) return;
+    final error = ref.read(authProvider).error;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        backgroundColor: HamsaColors.bgElevated,
+        content: Text(
+          isAr
+              ? 'تعذر حذف الحساب. حاول مرة أخرى.'
+              : error ?? 'Could not delete account. Please try again.',
+          style: HamsaText.body(size: 14, color: HamsaColors.cream),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = ref.watch(authProvider);
@@ -64,12 +230,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   userName: auth.user?.fullName ?? '',
                   isAr: isAr,
                   onOrdersTap: () => context.push(AppRoutes.myOrders),
-                  onToggleLocale: () => ref
-                      .read(localeProvider.notifier)
-                      .setLocale(isAr ? 'en' : 'ar'),
-                  onSignOut: () async {
-                    await ref.read(authProvider.notifier).logout();
+                  onToggleLocale: () {
+                    final next = isAr ? 'en' : 'ar';
+                    ref.read(localeProvider.notifier).setLocale(next);
+                    ref.read(authProvider.notifier).updateLanguage(next);
                   },
+                  onAccountTap: () => _showAccountSheet(isAr),
                 ),
               ),
 
@@ -156,7 +322,7 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   final bool isAr;
   final VoidCallback onOrdersTap;
   final VoidCallback onToggleLocale;
-  final VoidCallback onSignOut;
+  final VoidCallback onAccountTap;
 
   const _HomeHeaderDelegate({
     required this.collapsed,
@@ -164,7 +330,7 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.isAr,
     required this.onOrdersTap,
     required this.onToggleLocale,
-    required this.onSignOut,
+    required this.onAccountTap,
   });
 
   @override
@@ -223,10 +389,10 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                       ),
                     ),
                     // Buttons (right in EN)
-                    _ActionButtons(isAr: isAr, onToggleLocale: onToggleLocale, onOrdersTap: onOrdersTap, onSignOut: onSignOut),
+                    _ActionButtons(isAr: isAr, onToggleLocale: onToggleLocale, onOrdersTap: onOrdersTap, onAccountTap: onAccountTap),
                   ] else ...[
                     // Buttons (left in AR)
-                    _ActionButtons(isAr: isAr, onToggleLocale: onToggleLocale, onOrdersTap: onOrdersTap, onSignOut: onSignOut),
+                    _ActionButtons(isAr: isAr, onToggleLocale: onToggleLocale, onOrdersTap: onOrdersTap, onAccountTap: onAccountTap),
                     // Greeting (right in AR)
                     Expanded(
                       child: Column(
@@ -272,13 +438,13 @@ class _ActionButtons extends StatelessWidget {
   final bool isAr;
   final VoidCallback onToggleLocale;
   final VoidCallback onOrdersTap;
-  final VoidCallback onSignOut;
+  final VoidCallback onAccountTap;
 
   const _ActionButtons({
     required this.isAr,
     required this.onToggleLocale,
     required this.onOrdersTap,
-    required this.onSignOut,
+    required this.onAccountTap,
   });
 
   @override
@@ -300,10 +466,50 @@ class _ActionButtons extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         _HeaderIconBtn(
-          onTap: onSignOut,
-          child: const Icon(Icons.logout_rounded, color: HamsaColors.cream, size: 20),
+          onTap: onAccountTap,
+          child: const Icon(Icons.person_outline_rounded, color: HamsaColors.cream, size: 20),
         ),
       ],
+    );
+  }
+}
+
+// ─── Account Sheet Tile ──────────────────────────────────────
+class _AccountSheetTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _AccountSheetTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+        decoration: BoxDecoration(
+          color: HamsaColors.bgCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: HamsaColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 22),
+            const SizedBox(width: 14),
+            Text(
+              label,
+              style: HamsaText.body(size: 15, weight: FontWeight.w600, color: color),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

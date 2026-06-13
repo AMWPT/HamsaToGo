@@ -106,6 +106,39 @@ def upsert_customer(uid: str, phone: str, full_name: str) -> None:
         print(f"[Postgres] upsert_customer failed: {e}")
 
 
+def delete_customer(uid: str) -> None:
+    """
+    Remove a customer from analytics on account deletion.
+
+    Hard-deletes the row when the customer has no orders. If they have
+    past orders, the orders FK (orders.customer_id REFERENCES customers)
+    prevents a hard delete and we must preserve them for revenue history,
+    so we instead scrub the personal data (name/phone/fcm token).
+    """
+    conn = _get_conn()
+    if not conn:
+        return
+    try:
+        with conn.cursor() as cur:
+            cur.execute("SELECT COUNT(*) FROM orders WHERE customer_id = %s", (uid,))
+            has_orders = cur.fetchone()[0] > 0
+            if has_orders:
+                cur.execute(
+                    """
+                    UPDATE customers
+                    SET full_name = 'Deleted Account',
+                        phone     = NULL,
+                        fcm_token = NULL
+                    WHERE id = %s
+                    """,
+                    (uid,),
+                )
+            else:
+                cur.execute("DELETE FROM customers WHERE id = %s", (uid,))
+    except Exception as e:
+        print(f"[Postgres] delete_customer failed: {e}")
+
+
 # ─── Orders ───────────────────────────────────────────────────
 
 def insert_order(order_data: dict) -> None:

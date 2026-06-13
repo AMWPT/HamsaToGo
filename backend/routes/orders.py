@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Query
 from models.order import OrderCreate, OrderStatusUpdate, OrderResponse, OrderStatus
 from services import firestore as db
 from services import postgres as pg
-from services.fcm import notify_order_ready, notify_order_received
+from services.fcm import notify_order_status
 from typing import List, Optional
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
@@ -43,9 +43,10 @@ def place_order(order: OrderCreate):
     pg.insert_order_items(data["id"], data.get("items", []))
 
     # Notify customer that order was received
-    notify_order_received(
+    notify_order_status(
         customer_id=order.customer_id,
         order_id=data["id"],
+        status="received",
     )
 
     return OrderResponse(**data)
@@ -99,8 +100,7 @@ def update_order_status(order_id: str, update: OrderStatusUpdate):
     Flow:
       received → in_progress → ready → picked_up
 
-    When status becomes 'ready':
-      → Push notification is sent to the customer automatically.
+    A push notification is sent to the customer on every status change.
     """
     order = db.get_order(order_id)
     if not order:
@@ -130,11 +130,11 @@ def update_order_status(order_id: str, update: OrderStatusUpdate):
     # Sync status to PostgreSQL
     pg.update_order_status(order_id, update.status.value)
 
-    # Send push notification when order is ready
-    if update.status == OrderStatus.READY:
-        notify_order_ready(
-            customer_id=order["customer_id"],
-            order_id=order_id,
-        )
+    # Notify the customer of the new status (in_progress / ready / picked_up)
+    notify_order_status(
+        customer_id=order["customer_id"],
+        order_id=order_id,
+        status=update.status.value,
+    )
 
     return OrderResponse(**updated)
