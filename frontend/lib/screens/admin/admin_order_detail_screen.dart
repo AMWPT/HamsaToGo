@@ -176,6 +176,42 @@ class _Body extends ConsumerWidget {
                     .animate(delay: 300.ms)
                     .fadeIn(duration: 350.ms),
 
+                const SizedBox(height: 16),
+
+                // Payment method
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      'PAYMENT',
+                      style: HamsaText.caption(
+                          size: 11, color: HamsaColors.muted),
+                    ),
+                    Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _paymentIcon(order.paymentMethod),
+                          size: 16,
+                          color: HamsaColors.creamMuted,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          order.paymentMethod?.label(isAr) ??
+                              (isAr ? 'غير محدد' : 'Not specified'),
+                          style: HamsaText.body(
+                            size: 14,
+                            weight: FontWeight.w600,
+                            color: HamsaColors.offWhite,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                )
+                    .animate(delay: 350.ms)
+                    .fadeIn(duration: 350.ms),
+
                 if (order.notes != null &&
                     order.notes!.isNotEmpty) ...[
                   const SizedBox(height: 20),
@@ -259,6 +295,14 @@ class _Body extends ConsumerWidget {
           isAr ? 'تأكيد جاهزية الطلب للاستلام' : 'Mark as Ready for Pickup',
         OrderStatus.pickedUp =>
           isAr ? 'تأكيد استلام الطلب' : 'Mark as Picked Up',
+      };
+
+  IconData _paymentIcon(PaymentMethod? m) => switch (m) {
+        PaymentMethod.mada => Icons.account_balance_rounded,
+        PaymentMethod.card => Icons.credit_card_rounded,
+        PaymentMethod.applePay => Icons.apple_rounded,
+        PaymentMethod.stcPay => Icons.account_balance_wallet_rounded,
+        null => Icons.help_outline_rounded,
       };
 
   String _timeAgo(DateTime dt) {

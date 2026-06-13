@@ -90,6 +90,69 @@ enum OrderStatus {
   }
 }
 
+enum PaymentMethod {
+  mada,
+  card, // Visa / Mastercard
+  applePay,
+  stcPay;
+
+  String toApiString() {
+    switch (this) {
+      case mada:
+        return 'mada';
+      case card:
+        return 'card';
+      case applePay:
+        return 'apple_pay';
+      case stcPay:
+        return 'stc_pay';
+    }
+  }
+
+  static PaymentMethod? fromString(String? s) {
+    switch (s) {
+      case 'mada':
+        return mada;
+      case 'card':
+        return card;
+      case 'apple_pay':
+        return applePay;
+      case 'stc_pay':
+        return stcPay;
+      default:
+        return null;
+    }
+  }
+
+  String labelEn() {
+    switch (this) {
+      case mada:
+        return 'mada';
+      case card:
+        return 'Card';
+      case applePay:
+        return 'Apple Pay';
+      case stcPay:
+        return 'STC Pay';
+    }
+  }
+
+  String labelAr() {
+    switch (this) {
+      case mada:
+        return 'مدى';
+      case card:
+        return 'بطاقة';
+      case applePay:
+        return 'Apple Pay';
+      case stcPay:
+        return 'STC Pay';
+    }
+  }
+
+  String label(bool isAr) => isAr ? labelAr() : labelEn();
+}
+
 class OrderItemModel {
   final String menuItemId;
   final String nameEn;
@@ -142,6 +205,7 @@ class Order {
   final List<OrderItemModel> items;
   final double totalPrice;
   final OrderStatus status;
+  final PaymentMethod? paymentMethod;
   final String? notes;
   final DateTime createdAt;
   final DateTime? updatedAt;
@@ -153,6 +217,7 @@ class Order {
     required this.items,
     required this.totalPrice,
     required this.status,
+    this.paymentMethod,
     this.notes,
     required this.createdAt,
     this.updatedAt,
@@ -173,6 +238,7 @@ class Order {
             .toList(),
         totalPrice: (json['total_price'] as num).toDouble(),
         status: OrderStatus.fromString(json['status'] as String),
+        paymentMethod: PaymentMethod.fromString(json['payment_method'] as String?),
         notes: json['notes'] as String?,
         createdAt: DateTime.parse(json['created_at'] as String),
         updatedAt: json['updated_at'] != null
@@ -197,6 +263,7 @@ class Order {
           .toList(),
       totalPrice: (json['total_price'] as num).toDouble(),
       status: OrderStatus.fromString(json['status'] as String),
+      paymentMethod: PaymentMethod.fromString(json['payment_method'] as String?),
       notes: json['notes'] as String?,
       createdAt: parseTs(json['created_at']),
       updatedAt: json['updated_at'] != null ? parseTs(json['updated_at']) : null,

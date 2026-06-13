@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS orders (
     status          VARCHAR(20)     NOT NULL DEFAULT 'received',
     total_price     DECIMAL(10, 2)  NOT NULL,
     notes           TEXT            DEFAULT '',
-    payment_method  VARCHAR(50)     DEFAULT 'cash',
+    payment_method  VARCHAR(50),    -- online method (mada / card / apple_pay / stc_pay); no cash
     created_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at      TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     picked_up_at    TIMESTAMP WITH TIME ZONE
@@ -32,6 +32,10 @@ CREATE TABLE IF NOT EXISTS orders (
 
 -- Existing databases created before order_number was added
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_number BIGINT;
+
+-- Cash is no longer accepted — drop the legacy 'cash' default so new
+-- orders record the actual online method (or NULL if unknown).
+ALTER TABLE orders ALTER COLUMN payment_method DROP DEFAULT;
 
 CREATE INDEX IF NOT EXISTS idx_orders_customer_id  ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status        ON orders(status);

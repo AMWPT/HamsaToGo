@@ -156,8 +156,8 @@ def insert_order(order_data: dict) -> None:
                 """
                 INSERT INTO orders
                     (id, order_number, customer_id, customer_name, status,
-                     total_price, notes, created_at, updated_at)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     total_price, notes, payment_method, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                 ON CONFLICT (id) DO NOTHING
                 """,
                 (
@@ -168,6 +168,7 @@ def insert_order(order_data: dict) -> None:
                     order_data.get("status", "received"),
                     order_data["total_price"],
                     order_data.get("notes", ""),
+                    order_data.get("payment_method"),
                     order_data.get("created_at"),
                     order_data.get("created_at"),
                 ),
