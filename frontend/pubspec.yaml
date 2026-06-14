@@ -46,6 +46,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^4.0.0
+  flutter_launcher_icons: ^0.14.4
+
+# ─── App Icon generation (run: dart run flutter_launcher_icons) ───
+flutter_launcher_icons:
+  image_path: "assets/icon/icon.png"            # 1024×1024 master (2.jpg)
+  android: true
+  ios: true
+  remove_alpha_ios: true                        # App Store rejects icons with alpha
+  adaptive_icon_background: "#FFFFFF"           # matches the icon's white background
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"  # padded logo, white margins
 
 flutter:
   uses-material-design: true
