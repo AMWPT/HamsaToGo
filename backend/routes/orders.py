@@ -35,8 +35,10 @@ def place_order(order: OrderCreate):
                 detail=f"'{item.name_en}' is currently unavailable."
             )
 
-    # Create the order in Firestore
-    data = db.create_order(order.model_dump())
+    # Create the order in Firestore (store the method as a plain string)
+    payload = order.model_dump()
+    payload["payment_method"] = order.payment_method.value
+    data = db.create_order(payload)
 
     # Sync to PostgreSQL
     pg.insert_order(data)

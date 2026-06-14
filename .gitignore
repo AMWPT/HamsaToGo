@@ -1,6 +1,13 @@
 # Secrets - never commit these
 backend/.env
+backend/.env.*
+!backend/.env.example
 backend/firebase/serviceAccountKey.json
+**/serviceAccountKey.json
 **/*.keystore
 **/*.jks
 key.properties
+
+# Python bytecode
+**/__pycache__/
+*.pyc

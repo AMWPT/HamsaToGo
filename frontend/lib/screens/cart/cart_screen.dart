@@ -19,6 +19,7 @@ class CartScreen extends ConsumerStatefulWidget {
 
 class _CartScreenState extends ConsumerState<CartScreen> {
   bool _isPlacing = false;
+  PaymentMethod _method = PaymentMethod.mada;
 
   Future<void> _placeOrder() async {
     final cart = ref.read(cartProvider);
@@ -32,6 +33,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         customerId: auth.user!.id,
         customerName: auth.user!.fullName,
         items: cart,
+        paymentMethod: _method,
       );
       ref.read(cartProvider.notifier).clear();
       if (!mounted) return;
@@ -115,6 +117,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   total: total,
                   isAr: isAr,
                   isLoading: _isPlacing,
+                  selectedMethod: _method,
+                  onSelectMethod: (m) => setState(() => _method = m),
                   onPlaceOrder: _placeOrder,
                 ),
               ],
@@ -277,12 +281,16 @@ class _OrderSummary extends StatelessWidget {
   final double total;
   final bool isAr;
   final bool isLoading;
+  final PaymentMethod selectedMethod;
+  final ValueChanged<PaymentMethod> onSelectMethod;
   final VoidCallback onPlaceOrder;
 
   const _OrderSummary({
     required this.total,
     required this.isAr,
     required this.isLoading,
+    required this.selectedMethod,
+    required this.onSelectMethod,
     required this.onPlaceOrder,
   });
 
@@ -297,7 +305,29 @@ class _OrderSummary extends StatelessWidget {
         ),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          // Payment method
+          Align(
+            alignment: isAr ? Alignment.centerRight : Alignment.centerLeft,
+            child: Text(
+              isAr ? 'طريقة الدفع' : 'Payment method',
+              style: HamsaText.body(
+                size: 13,
+                weight: FontWeight.w600,
+                color: HamsaColors.creamMuted,
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          _PaymentMethodSelector(
+            selected: selectedMethod,
+            isAr: isAr,
+            onSelect: onSelectMethod,
+          ),
+
+          const SizedBox(height: 20),
+
           // Total row
           Row(
             textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
@@ -322,22 +352,101 @@ class _OrderSummary extends StatelessWidget {
 
           Text(
             isAr
-                ? '* لا يشمل أي ضرائب أو رسوم إضافية'
-                : '* No payment required — pick up in store',
-            style:
-                HamsaText.body(size: 11, color: HamsaColors.subtle),
+                ? '* سيتم الدفع إلكترونياً بالطريقة المختارة'
+                : '* Payment is collected online via the selected method',
+            style: HamsaText.body(size: 11, color: HamsaColors.subtle),
+            textAlign: isAr ? TextAlign.right : TextAlign.left,
           ),
 
           const SizedBox(height: 20),
 
           HamsaButton(
-            label: isAr ? 'تأكيد الطلب' : 'Place Order',
+            label: isAr ? 'الدفع وتأكيد الطلب' : 'Pay & Place Order',
             onTap: isLoading ? null : onPlaceOrder,
             isLoading: isLoading,
-            icon: Icons.check_circle_outline_rounded,
+            icon: Icons.lock_outline_rounded,
           ),
         ],
       ),
+    );
+  }
+}
+
+// ─── Payment Method Selector ──────────────────────────────────
+class _PaymentMethodSelector extends StatelessWidget {
+  final PaymentMethod selected;
+  final bool isAr;
+  final ValueChanged<PaymentMethod> onSelect;
+
+  const _PaymentMethodSelector({
+    required this.selected,
+    required this.isAr,
+    required this.onSelect,
+  });
+
+  IconData _iconFor(PaymentMethod m) {
+    switch (m) {
+      case PaymentMethod.mada:
+        return Icons.account_balance_rounded;
+      case PaymentMethod.card:
+        return Icons.credit_card_rounded;
+      case PaymentMethod.applePay:
+        return Icons.apple_rounded;
+      case PaymentMethod.stcPay:
+        return Icons.account_balance_wallet_rounded;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 10,
+      runSpacing: 10,
+      children: PaymentMethod.values.map((m) {
+        final isSelected = m == selected;
+        return GestureDetector(
+          onTap: () => onSelect(m),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: isSelected
+                  ? HamsaColors.greenAccent.withValues(alpha: 0.15)
+                  : HamsaColors.bgElevated,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: isSelected
+                    ? HamsaColors.greenAccent
+                    : HamsaColors.border,
+                width: isSelected ? 1.5 : 1,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _iconFor(m),
+                  size: 18,
+                  color: isSelected
+                      ? HamsaColors.greenAccent
+                      : HamsaColors.creamMuted,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  m.label(isAr),
+                  style: HamsaText.body(
+                    size: 13,
+                    weight: FontWeight.w600,
+                    color: isSelected
+                        ? HamsaColors.cream
+                        : HamsaColors.offWhite,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
     );
   }
 }

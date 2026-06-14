@@ -145,12 +145,14 @@ class ApiService {
     required String customerId,
     required String customerName,
     required List<CartItem> items,
+    required PaymentMethod paymentMethod,
     String? notes,
   }) async {
     final res = await _dio.post('/orders/', data: {
       'customer_id': customerId,
       'customer_name': customerName,
       'items': items.map((i) => i.toOrderItem().toJson()).toList(),
+      'payment_method': paymentMethod.toApiString(),
       if (notes != null) 'notes': notes,
     });
     return Order.fromJson(res.data as Map<String, dynamic>);

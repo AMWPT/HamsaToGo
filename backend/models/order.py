@@ -11,6 +11,14 @@ class OrderStatus(str, Enum):
     PICKED_UP  = "picked_up"
 
 
+class PaymentMethod(str, Enum):
+    """Online payment methods (no cash — orders must be paid online)."""
+    MADA      = "mada"
+    CARD      = "card"        # Visa / Mastercard
+    APPLE_PAY = "apple_pay"
+    STC_PAY   = "stc_pay"
+
+
 # ─── Order Item (snapshot of menu item at time of order) ─────
 class OrderItemCreate(BaseModel):
     menu_item_id: str
@@ -37,6 +45,7 @@ class OrderCreate(BaseModel):
     customer_id: str
     customer_name: str
     items: List[OrderItemCreate]
+    payment_method: PaymentMethod        # required — orders are paid online
     notes: str = ""
 
 
@@ -51,6 +60,7 @@ class OrderResponse(BaseModel):
     customer_name: str
     items: List[OrderItemResponse]
     status: OrderStatus
+    payment_method: Optional[str] = None
     notes: str
     total_price: float
     created_at: Optional[datetime] = None
