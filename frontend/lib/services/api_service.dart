@@ -73,14 +73,6 @@ class ApiService {
     );
   }
 
-  Future<bool> verifyAdmin(String password) async {
-    final res = await _dio.post('/auth/admin/verify', data: {
-      'email': 'admin@hamsa.com',
-      'password': password,
-    });
-    return (res.data as Map<String, dynamic>)['success'] == true;
-  }
-
   /// Staff login via Firebase phone OTP. [idToken] = Firebase ID token.
   Future<bool> verifyAdminPhone(String idToken) async {
     final res = await _dio.post('/auth/admin/phone-verify', data: {

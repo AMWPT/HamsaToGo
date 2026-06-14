@@ -5,8 +5,11 @@ import 'auth_provider.dart';
 
 final _fs = FirebaseFirestore.instance;
 
-// Customer: my orders — real-time stream
-final myOrdersProvider = StreamProvider<List<Order>>((ref) {
+// Customer: my orders — real-time stream.
+// autoDispose so the listener is rebuilt fresh under the current user and
+// never lingers across a logout / role switch (which would latch a
+// permission-denied error from Firestore security rules).
+final myOrdersProvider = StreamProvider.autoDispose<List<Order>>((ref) {
   final userId = ref.watch(authProvider).user?.id;
   if (userId == null) return const Stream.empty();
   return _fs
@@ -21,7 +24,7 @@ final myOrdersProvider = StreamProvider<List<Order>>((ref) {
 });
 
 // Admin: active queue (received + in_progress + ready) — real-time stream
-final activeOrdersProvider = StreamProvider<List<Order>>((ref) {
+final activeOrdersProvider = StreamProvider.autoDispose<List<Order>>((ref) {
   return _fs
       .collection('orders')
       .where('status', whereIn: ['received', 'in_progress', 'ready'])
@@ -34,7 +37,7 @@ final activeOrdersProvider = StreamProvider<List<Order>>((ref) {
 });
 
 // Admin: all orders — real-time stream
-final allOrdersProvider = StreamProvider<List<Order>>((ref) {
+final allOrdersProvider = StreamProvider.autoDispose<List<Order>>((ref) {
   return _fs
       .collection('orders')
       .snapshots()
@@ -46,7 +49,8 @@ final allOrdersProvider = StreamProvider<List<Order>>((ref) {
 });
 
 // Single order — real-time stream
-final singleOrderProvider = StreamProvider.family<Order, String>((ref, orderId) {
+final singleOrderProvider =
+    StreamProvider.autoDispose.family<Order, String>((ref, orderId) {
   return _fs
       .collection('orders')
       .doc(orderId)

@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -51,7 +52,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
     try {
       final isAdmin = await _storage.read(key: StorageKeys.isAdmin);
       if (isAdmin == 'true') {
-        state = const AuthState(isAdmin: true);
+        // Staff access is enforced by Firestore rules at read time (via the
+        // /staff/{uid} doc). Just confirm a live Firebase session still backs
+        // it; if it's gone, drop to a clean logout rather than a dead dashboard.
+        if (FirebaseAuth.instance.currentUser != null) {
+          state = const AuthState(isAdmin: true);
+          return;
+        }
+        await _storage.deleteAll();
+        state = const AuthState();
         return;
       }
 
@@ -98,24 +107,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<bool> loginAdmin(String password) async {
-    state = state.copyWith(isLoading: true, error: null);
-    try {
-      final valid = await _api.verifyAdmin(password);
-      if (valid) {
-        await _storage.write(key: StorageKeys.isAdmin, value: 'true');
-        state = const AuthState(isAdmin: true);
-        return true;
-      } else {
-        state = state.copyWith(isLoading: false, error: 'Invalid password');
-        return false;
-      }
-    } catch (e) {
-      state = state.copyWith(isLoading: false, error: _parseError(e));
-      return false;
-    }
-  }
-
   /// Staff login via Firebase phone OTP.
   /// [idToken] = Firebase ID token from a verified phone sign-in.
   Future<bool> loginAdminPhone(String idToken) async {
@@ -155,6 +146,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> logout() async {
+    // Clear the Firebase session too — otherwise it leaks into the next login
+    // (e.g. switching between a customer and staff on the same device), and
+    // Firestore security rules would run against the wrong user's token.
+    try {
+      await FirebaseAuth.instance.signOut();
+    } catch (_) {}
     await _storage.deleteAll();
     state = const AuthState();
   }

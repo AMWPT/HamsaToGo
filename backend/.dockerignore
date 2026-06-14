@@ -1,0 +1,13 @@
+# Never ship secrets into the image — provide these via env / Secret Manager.
+.env
+.env.*
+firebase/serviceAccountKey.json
+**/serviceAccountKey.json
+
+# Python / dev cruft
+__pycache__/
+*.pyc
+.venv/
+venv/
+.pytest_cache/
+*.md

@@ -18,13 +18,6 @@ abstract class StorageKeys {
   static const fcmToken = 'fcm_token';
 }
 
-// ─── Admin Credentials ───────────────────────────────────────
-abstract class AdminConstants {
-  /// The fixed admin email — one shared device
-  static const adminEmail = 'admin@hamsa.coffee';
-  static const adminPin = '1234'; // Change this!
-}
-
 // ─── App Info ────────────────────────────────────────────────
 abstract class AppConstants {
   static const appName = 'Hamsa To Go';
