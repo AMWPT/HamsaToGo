@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../models/order.dart';
+import '../../providers/locale_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../widgets/lang_toggle_button.dart';
 
 class HistoryScreen extends ConsumerWidget {
   const HistoryScreen({super.key});
@@ -12,6 +14,7 @@ class HistoryScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final ordersAsync = ref.watch(allOrdersProvider);
+    final isAr = ref.watch(localeProvider).languageCode == 'ar';
 
     return Scaffold(
       backgroundColor: HamsaColors.bgDeep,
@@ -23,9 +26,10 @@ class HistoryScreen extends ConsumerWidget {
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Order History',
+          isAr ? 'سجل الطلبات' : 'Order History',
           style: HamsaText.heading(size: 18, color: HamsaColors.cream),
         ),
+        actions: const [LangToggleButton(), SizedBox(width: 8)],
       ),
       body: ordersAsync.when(
         data: (orders) {
@@ -36,7 +40,7 @@ class HistoryScreen extends ConsumerWidget {
           if (sorted.isEmpty) {
             return Center(
               child: Text(
-                'No orders yet',
+                isAr ? 'لا توجد طلبات بعد' : 'No orders yet',
                 style: HamsaText.body(color: HamsaColors.muted),
               ),
             );
@@ -45,7 +49,7 @@ class HistoryScreen extends ConsumerWidget {
           // Group by date
           final groups = <String, List<Order>>{};
           for (final o in sorted) {
-            final key = _dateLabel(o.createdAt);
+            final key = _dateLabel(o.createdAt, isAr);
             groups.putIfAbsent(key, () => []).add(o);
           }
 
@@ -75,7 +79,7 @@ class HistoryScreen extends ConsumerWidget {
                                   milliseconds: sectionIdx * 40))
                           .fadeIn(duration: 300.ms),
                       ...section.value.asMap().entries.map(
-                        (entry) => _HistoryCard(order: entry.value)
+                        (entry) => _HistoryCard(order: entry.value, isAr: isAr)
                             .animate(
                               delay: Duration(
                                   milliseconds:
@@ -98,7 +102,7 @@ class HistoryScreen extends ConsumerWidget {
         ),
         error: (_, __) => Center(
           child: Text(
-            'Error loading history',
+            isAr ? 'تعذّر تحميل السجل' : 'Error loading history',
             style: HamsaText.body(color: HamsaColors.muted),
           ),
         ),
@@ -106,21 +110,22 @@ class HistoryScreen extends ConsumerWidget {
     );
   }
 
-  String _dateLabel(DateTime dt) {
+  String _dateLabel(DateTime dt, bool isAr) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final date = DateTime(dt.year, dt.month, dt.day);
 
     final diff = today.difference(date).inDays;
-    if (diff == 0) return 'Today';
-    if (diff == 1) return 'Yesterday';
+    if (diff == 0) return isAr ? 'اليوم' : 'Today';
+    if (diff == 1) return isAr ? 'أمس' : 'Yesterday';
     return '${dt.day}/${dt.month}/${dt.year}';
   }
 }
 
 class _HistoryCard extends StatelessWidget {
   final Order order;
-  const _HistoryCard({required this.order});
+  final bool isAr;
+  const _HistoryCard({required this.order, required this.isAr});
 
   @override
   Widget build(BuildContext context) {
@@ -189,7 +194,7 @@ class _HistoryCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  order.status.labelEn(),
+                  order.status.label(isAr),
                   style: HamsaText.body(
                     size: 11,
                     color: statusColor,

@@ -9,6 +9,7 @@ import '../../core/router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../widgets/hamsa_button.dart';
+import '../../widgets/lang_toggle_button.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -151,6 +152,10 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             }
           },
         ),
+        actions: const [
+          LangToggleButton(),
+          SizedBox(width: 8),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -248,7 +253,10 @@ class _Step1 extends StatelessWidget {
           child: TextField(
             controller: nameCtrl,
             textCapitalization: TextCapitalization.words,
-            style: HamsaText.body(size: 16, color: HamsaColors.cream),
+            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+            style: isAr
+                ? HamsaText.arabic(size: 16, color: HamsaColors.cream)
+                : HamsaText.body(size: 16, color: HamsaColors.cream),
             decoration: _inputDeco(isAr ? 'مثال: أحمد محمد' : 'e.g. Ahmed Mohammed'),
           ),
         ),

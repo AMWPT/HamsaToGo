@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../models/menu_item.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../providers/menu_provider.dart';
 import '../../widgets/hamsa_button.dart';
 import '../../widgets/hamsa_input.dart';
+import '../../widgets/lang_toggle_button.dart';
 
 class MenuManagerScreen extends ConsumerStatefulWidget {
   const MenuManagerScreen({super.key});
@@ -23,8 +25,8 @@ class _MenuManagerScreenState extends ConsumerState<MenuManagerScreen> {
   @override
   Widget build(BuildContext context) {
     final categoriesAsync = ref.watch(categoriesProvider);
-    final itemsAsync =
-        ref.watch(allMenuItemsProvider(_selectedCategoryId));
+    final itemsAsync = ref.watch(allMenuItemsProvider(_selectedCategoryId));
+    final isAr = ref.watch(localeProvider).languageCode == 'ar';
 
     return Scaffold(
       backgroundColor: HamsaColors.bgDeep,
@@ -36,9 +38,10 @@ class _MenuManagerScreenState extends ConsumerState<MenuManagerScreen> {
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Menu Manager',
+          isAr ? 'إدارة القائمة' : 'Menu Manager',
           style: HamsaText.heading(size: 18, color: HamsaColors.cream),
         ),
+        actions: const [LangToggleButton(), SizedBox(width: 8)],
       ),
       body: Column(
         children: [
@@ -51,14 +54,14 @@ class _MenuManagerScreenState extends ConsumerState<MenuManagerScreen> {
                 scrollDirection: Axis.horizontal,
                 children: [
                   _FilterChip(
-                    label: 'All',
+                    label: isAr ? 'الكل' : 'All',
                     selected: _selectedCategoryId == null,
                     onTap: () =>
                         setState(() => _selectedCategoryId = null),
                   ),
                   ...cats.map(
                     (c) => _FilterChip(
-                      label: c.nameEn,
+                      label: isAr ? c.nameAr : c.nameEn,
                       selected: _selectedCategoryId == c.id,
                       onTap: () => setState(
                           () => _selectedCategoryId = c.id),
@@ -109,7 +112,7 @@ class _MenuManagerScreenState extends ConsumerState<MenuManagerScreen> {
         onPressed: () => _showAddSheet(context),
         icon: const Icon(Icons.add_rounded, color: HamsaColors.bgDeep),
         label: Text(
-          'Add Item',
+          isAr ? 'إضافة عنصر' : 'Add Item',
           style: HamsaText.body(
             size: 13,
             weight: FontWeight.w600,

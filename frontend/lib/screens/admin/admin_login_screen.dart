@@ -7,8 +7,10 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../core/router.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/locale_provider.dart';
 import '../../widgets/hamsa_button.dart';
 import '../../widgets/hamsa_logo.dart';
+import '../../widgets/lang_toggle_button.dart';
 
 class AdminLoginScreen extends ConsumerStatefulWidget {
   const AdminLoginScreen({super.key});
@@ -40,11 +42,13 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
     return '+966$digits';
   }
 
+  bool get _isAr => ref.read(localeProvider).languageCode == 'ar';
+
   // ── Send OTP ─────────────────────────────────────────────────
   Future<void> _sendCode() async {
     final phone = _fullPhone;
     if (phone.length < 10) {
-      _showError('Please enter a valid phone number');
+      _showError(_isAr ? 'أدخل رقم جوال صحيح' : 'Please enter a valid phone number');
       return;
     }
 
@@ -58,7 +62,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
       },
       verificationFailed: (FirebaseAuthException e) {
         setState(() => _sending = false);
-        _showError(e.message ?? 'Failed to send code');
+        _showError(e.message ?? (_isAr ? 'فشل إرسال الرمز' : 'Failed to send code'));
       },
       codeSent: (String verificationId, int? resendToken) {
         setState(() {
@@ -77,7 +81,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
   Future<void> _verifyCode() async {
     final code = _otpCtrl.text.trim();
     if (code.length != 6) {
-      _showError('Enter the 6-digit code');
+      _showError(_isAr ? 'أدخل الرمز المكوّن من 6 أرقام' : 'Enter the 6-digit code');
       return;
     }
     if (_verificationId == null) return;
@@ -92,7 +96,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
       await _signInWithCredential(credential);
     } on FirebaseAuthException catch (e) {
       setState(() => _verifying = false);
-      _showError(e.message ?? 'Invalid code');
+      _showError(e.message ?? (_isAr ? 'رمز غير صحيح' : 'Invalid code'));
     }
   }
 
@@ -112,16 +116,16 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
         await FirebaseAuth.instance.signOut();
         final error = ref.read(authProvider).error;
         _showError(error == 'Not authorized'
-            ? 'This number is not authorized for staff access.'
-            : 'Could not verify staff access. Please try again.');
+            ? (_isAr ? 'هذا الرقم غير مصرّح له بالدخول.' : 'This number is not authorized for staff access.')
+            : (_isAr ? 'تعذّر التحقق. حاول مجدداً.' : 'Could not verify staff access. Please try again.'));
       }
       // On success the router redirects to the admin dashboard automatically.
     } on FirebaseAuthException catch (e) {
       setState(() => _verifying = false);
-      _showError(e.message ?? 'Verification failed');
+      _showError(e.message ?? (_isAr ? 'فشل التحقق' : 'Verification failed'));
     } catch (e) {
       setState(() => _verifying = false);
-      _showError('Something went wrong. Try again.');
+      _showError(_isAr ? 'حدث خطأ. حاول مجدداً.' : 'Something went wrong. Try again.');
     }
   }
 
@@ -139,6 +143,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
   @override
   Widget build(BuildContext context) {
     final isBusy = _sending || _verifying;
+    final isAr = ref.watch(localeProvider).languageCode == 'ar';
 
     return Scaffold(
       backgroundColor: HamsaColors.bgDeep,
@@ -187,7 +192,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
                           const Icon(Icons.arrow_back_ios_new_rounded,
                               size: 16, color: HamsaColors.muted),
                           const SizedBox(width: 4),
-                          Text('Back',
+                          Text(isAr ? 'رجوع' : 'Back',
                               style: HamsaText.body(
                                   size: 13, color: HamsaColors.muted)),
                         ],
@@ -221,7 +226,7 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
                   const SizedBox(height: 24),
 
                   Text(
-                    'Staff Access',
+                    isAr ? 'دخول الموظفين' : 'Staff Access',
                     style:
                         HamsaText.display(size: 34, color: HamsaColors.cream),
                   ).animate(delay: 100.ms).fadeIn(duration: 400.ms),
@@ -230,8 +235,8 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
 
                   Text(
                     _step2
-                        ? 'Enter the 6-digit code sent to $_fullPhone'
-                        : 'Sign in with the authorized staff phone number',
+                        ? (isAr ? 'أدخل الرمز المرسل إلى $_fullPhone' : 'Enter the 6-digit code sent to $_fullPhone')
+                        : (isAr ? 'سجّل الدخول برقم جوال الموظف المعتمد' : 'Sign in with the authorized staff phone number'),
                     style: HamsaText.body(size: 13, color: HamsaColors.muted),
                     textAlign: TextAlign.center,
                   ).animate(delay: 200.ms).fadeIn(duration: 400.ms),
@@ -253,7 +258,9 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
                   const SizedBox(height: 24),
 
                   HamsaButton(
-                    label: _step2 ? 'Verify & Enter' : 'Send Code',
+                    label: _step2
+                        ? (isAr ? 'تحقق والدخول' : 'Verify & Enter')
+                        : (isAr ? 'إرسال الرمز' : 'Send Code'),
                     onTap: isBusy ? null : (_step2 ? _verifyCode : _sendCode),
                     isLoading: isBusy,
                     style: HamsaButtonStyle.gold,
@@ -276,6 +283,17 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
 
                   const SizedBox(height: 32),
                 ],
+              ),
+            ),
+          ),
+
+          // Language toggle — last so it sits on top
+          const SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(top: 12, right: 16),
+              child: Align(
+                alignment: Alignment.topRight,
+                child: LangToggleButton(),
               ),
             ),
           ),

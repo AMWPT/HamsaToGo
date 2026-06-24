@@ -8,6 +8,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../widgets/hamsa_button.dart';
+import '../../widgets/lang_toggle_button.dart';
 import '../../widgets/order_progress_timeline.dart';
 
 class AdminOrderDetailScreen extends ConsumerWidget {
@@ -17,6 +18,7 @@ class AdminOrderDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final orderAsync = ref.watch(singleOrderProvider(orderId));
+    final isAr = ref.watch(localeProvider).languageCode == 'ar';
 
     return Scaffold(
       backgroundColor: HamsaColors.bgDeep,
@@ -28,9 +30,10 @@ class AdminOrderDetailScreen extends ConsumerWidget {
           onPressed: () => context.pop(),
         ),
         title: Text(
-          'Order Details',
+          isAr ? 'تفاصيل الطلب' : 'Order Details',
           style: HamsaText.heading(size: 18, color: HamsaColors.cream),
         ),
+        actions: const [LangToggleButton(), SizedBox(width: 8)],
       ),
       body: orderAsync.when(
         data: (order) => _Body(order: order),
@@ -95,7 +98,7 @@ class _Body extends ConsumerWidget {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            _timeAgo(order.createdAt),
+                            _timeAgo(order.createdAt, isAr),
                             style: HamsaText.body(
                                 size: 12, color: HamsaColors.muted),
                           ),
@@ -305,11 +308,11 @@ class _Body extends ConsumerWidget {
         null => Icons.help_outline_rounded,
       };
 
-  String _timeAgo(DateTime dt) {
+  String _timeAgo(DateTime dt, bool isAr) {
     final diff = DateTime.now().difference(dt);
-    if (diff.inSeconds < 60) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    return '${diff.inHours}h ago';
+    if (diff.inSeconds < 60) return isAr ? 'الآن' : 'Just now';
+    if (diff.inMinutes < 60) return isAr ? 'منذ ${diff.inMinutes} د' : '${diff.inMinutes}m ago';
+    return isAr ? 'منذ ${diff.inHours} س' : '${diff.inHours}h ago';
   }
 }
 

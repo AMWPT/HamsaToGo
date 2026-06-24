@@ -8,6 +8,7 @@ import '../../models/order.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/order_provider.dart';
+import '../../widgets/lang_toggle_button.dart';
 
 class AdminDashboardScreen extends ConsumerStatefulWidget {
   const AdminDashboardScreen({super.key});
@@ -23,6 +24,7 @@ class _AdminDashboardScreenState
   @override
   Widget build(BuildContext context) {
     final ordersAsync = ref.watch(activeOrdersProvider);
+    final isAr = ref.watch(localeProvider).languageCode == 'ar';
 
     return Scaffold(
       backgroundColor: HamsaColors.bgDeep,
@@ -41,12 +43,12 @@ class _AdminDashboardScreenState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Dashboard',
+                          isAr ? 'لوحة التحكم' : 'Dashboard',
                           style: HamsaText.display(
                               size: 32, color: HamsaColors.cream),
                         ),
                         Text(
-                          'Live order queue',
+                          isAr ? 'قائمة الطلبات المباشرة' : 'Live order queue',
                           style: HamsaText.body(
                               size: 13, color: HamsaColors.muted),
                         ),
@@ -56,6 +58,8 @@ class _AdminDashboardScreenState
                     // Nav icons
                     Row(
                       children: [
+                        const LangToggleButton(),
+                        const SizedBox(width: 8),
                         _NavIcon(
                           icon: Icons.menu_book_outlined,
                           label: 'Menu',
@@ -86,7 +90,7 @@ class _AdminDashboardScreenState
           // Stats row
           SliverToBoxAdapter(
             child: ordersAsync.when(
-              data: (orders) => _StatsRow(orders: orders)
+              data: (orders) => _StatsRow(orders: orders, isAr: isAr)
                   .animate(delay: 200.ms)
                   .fadeIn(duration: 400.ms),
               loading: () => const SizedBox(height: 80),
@@ -100,7 +104,7 @@ class _AdminDashboardScreenState
               padding:
                   const EdgeInsets.fromLTRB(24, 8, 24, 12),
               child: Text(
-                'ACTIVE ORDERS',
+                isAr ? 'الطلبات النشطة' : 'ACTIVE ORDERS',
                 style: HamsaText.caption(
                     size: 11, color: HamsaColors.muted),
               ),
@@ -112,7 +116,7 @@ class _AdminDashboardScreenState
             data: (orders) {
               if (orders.isEmpty) {
                 return SliverToBoxAdapter(
-                  child: _EmptyQueue()
+                  child: _EmptyQueue(isAr: isAr)
                       .animate(delay: 300.ms)
                       .fadeIn(duration: 400.ms),
                 );
@@ -159,7 +163,7 @@ class _AdminDashboardScreenState
                 child: Padding(
                   padding: const EdgeInsets.all(32),
                   child: Text(
-                    'Failed to load orders',
+                    isAr ? 'تعذّر تحميل الطلبات' : 'Failed to load orders',
                     style: HamsaText.body(color: HamsaColors.muted),
                   ),
                 ),
@@ -176,7 +180,8 @@ class _AdminDashboardScreenState
 // ─── Stats Row ───────────────────────────────────────────────
 class _StatsRow extends StatelessWidget {
   final List<Order> orders;
-  const _StatsRow({required this.orders});
+  final bool isAr;
+  const _StatsRow({required this.orders, required this.isAr});
 
   @override
   Widget build(BuildContext context) {
@@ -194,7 +199,7 @@ class _StatsRow extends StatelessWidget {
         children: [
           Expanded(
             child: _StatChip(
-              label: 'New',
+              label: isAr ? 'جديد' : 'New',
               value: '$received',
               color: HamsaColors.statusReceived,
             ),
@@ -202,7 +207,7 @@ class _StatsRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: _StatChip(
-              label: 'Preparing',
+              label: isAr ? 'يُحضَّر' : 'Preparing',
               value: '$inProgress',
               color: HamsaColors.statusInProgress,
             ),
@@ -210,7 +215,7 @@ class _StatsRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: _StatChip(
-              label: 'Ready',
+              label: isAr ? 'جاهز' : 'Ready',
               value: '$ready',
               color: HamsaColors.statusReady,
             ),
@@ -218,7 +223,7 @@ class _StatsRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: _StatChip(
-              label: 'Queue',
+              label: isAr ? 'الكل' : 'Queue',
               value: '$total',
               color: HamsaColors.greenAccent,
             ),
@@ -444,6 +449,9 @@ class AdminOrderCard extends ConsumerWidget {
 
 // ─── Empty Queue ─────────────────────────────────────────────
 class _EmptyQueue extends StatelessWidget {
+  final bool isAr;
+  const _EmptyQueue({required this.isAr});
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -454,13 +462,13 @@ class _EmptyQueue extends StatelessWidget {
             const Text('☕', style: TextStyle(fontSize: 56)),
             const SizedBox(height: 16),
             Text(
-              'Queue is empty',
+              isAr ? 'القائمة فارغة' : 'Queue is empty',
               style: HamsaText.heading(
                   size: 20, color: HamsaColors.cream),
             ),
             const SizedBox(height: 8),
             Text(
-              'New orders will appear here',
+              isAr ? 'ستظهر الطلبات الجديدة هنا' : 'New orders will appear here',
               style:
                   HamsaText.body(size: 13, color: HamsaColors.muted),
             ),

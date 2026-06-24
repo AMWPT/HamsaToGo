@@ -10,6 +10,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../widgets/hamsa_button.dart';
 import '../../widgets/hamsa_logo.dart';
+import '../../widgets/lang_toggle_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -261,6 +262,17 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   const SizedBox(height: 40),
                 ],
+              ),
+            ),
+          ),
+
+          // Language toggle — last so it sits on top
+          const SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(top: 12, right: 16),
+              child: Align(
+                alignment: Alignment.topRight,
+                child: LangToggleButton(),
               ),
             ),
           ),
