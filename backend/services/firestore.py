@@ -9,6 +9,7 @@ CATEGORIES  = "categories"
 MENU_ITEMS  = "menu_items"
 ORDERS      = "orders"
 COUNTERS    = "counters"
+STAFF       = "staff"
 
 
 def now() -> datetime:
@@ -55,6 +56,17 @@ def delete_user(uid: str):
     """Permanently remove a customer's profile document."""
     db = get_firestore()
     db.collection(USERS).document(uid).delete()
+
+
+# ─── Staff ───────────────────────────────────────────────────
+def mark_staff(uid: str, phone: str = "") -> None:
+    """
+    Record a verified staff member as a /staff/{uid} document.
+    Firestore security rules check for this document to grant the staff
+    member read access to the order queue — no ID-token refresh needed.
+    """
+    db = get_firestore()
+    db.collection(STAFF).document(uid).set({"phone": phone, "added_at": now()})
 
 
 # ─── Categories ──────────────────────────────────────────────

@@ -16,15 +16,18 @@ def init_firebase():
 
     cred_path = os.getenv("FIREBASE_CREDENTIALS_PATH", "firebase/serviceAccountKey.json")
 
-    if not os.path.exists(cred_path):
-        raise FileNotFoundError(
-            f"Firebase credentials not found at '{cred_path}'.\n"
-            "Download your service account key from:\n"
-            "Firebase Console → Project Settings → Service Accounts → Generate new private key"
+    if os.path.exists(cred_path):
+        # Local development — use the downloaded service account key file.
+        cred = credentials.Certificate(cred_path)
+        _app = firebase_admin.initialize_app(cred)
+    else:
+        # Production (e.g. Cloud Run) — use Application Default Credentials
+        # from the runtime's service account. No key file is shipped or needed.
+        print(
+            f"[Firebase] No key file at '{cred_path}'; "
+            "falling back to Application Default Credentials."
         )
-
-    cred = credentials.Certificate(cred_path)
-    _app = firebase_admin.initialize_app(cred)
+        _app = firebase_admin.initialize_app()
     return _app
 
 

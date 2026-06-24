@@ -1,0 +1,73 @@
+rules_version = '2';
+
+// ─────────────────────────────────────────────────────────────
+// Hamsa To Go — Firestore Security Rules
+//
+// Model:
+//   • All WRITES happen server-side via the Firebase Admin SDK
+//     (the backend), which bypasses these rules. Clients never
+//     write directly — so every write below is denied.
+//   • The Flutter app reads ORDERS directly (real-time streams):
+//       – a customer may read only their own orders
+//       – staff (those with a /staff/{uid} document) may read all orders
+//   • Menu/categories are a public catalog (read-only to clients).
+//   • User profiles: a customer may read only their own document.
+// ─────────────────────────────────────────────────────────────
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isStaff() {
+      // A staff member has a /staff/{uid} document (written by the backend on
+      // phone-verify). exists() is evaluated with rules privileges, so staff
+      // don't need read access to the collection itself.
+      return isSignedIn()
+             && exists(/databases/$(database)/documents/staff/$(request.auth.uid));
+    }
+
+    // Public catalog — readable by any signed-in user; edits are backend-only.
+    match /menu_items/{itemId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+    match /categories/{categoryId} {
+      allow read: if isSignedIn();
+      allow write: if false;
+    }
+
+    // Customer profile — a user may read only their own document.
+    // FCM token / language / deletion all go through the backend.
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    // Orders — customers read only their own; staff read all.
+    // Creation and status changes happen server-side (Admin SDK).
+    match /orders/{orderId} {
+      allow read: if isStaff()
+                  || (isSignedIn() && resource.data.customer_id == request.auth.uid);
+      allow write: if false;
+    }
+
+    // Internal order-number counter — backend only.
+    match /counters/{doc} {
+      allow read, write: if false;
+    }
+
+    // Staff roster — written by the backend; never read/written by clients.
+    // (Rules' exists() check above still works regardless of this.)
+    match /staff/{uid} {
+      allow read, write: if false;
+    }
+
+    // Anything not matched above is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

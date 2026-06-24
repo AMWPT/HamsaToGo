@@ -1,7 +1,7 @@
 import os
 from fastapi import APIRouter, Header, HTTPException, status
 from firebase_admin import auth as firebase_auth
-from models.user import PhoneVerifyRequest, UserUpdate, UserResponse, AdminLogin, AdminPhoneVerify
+from models.user import PhoneVerifyRequest, UserUpdate, UserResponse, AdminPhoneVerify
 from services import firestore as db
 from services import postgres as pg
 
@@ -140,25 +140,20 @@ def delete_user(user_id: str, authorization: str = Header(None)):
     return None
 
 
-# ─── Admin Login ──────────────────────────────────────────────
-@router.post("/admin/verify")
-def verify_admin(credentials: AdminLogin):
-    """Fixed admin credentials check (single shared device)."""
-    admin_email    = os.getenv("ADMIN_EMAIL", "admin@hamsa.com")
-    admin_password = os.getenv("ADMIN_PASSWORD", "")
-
-    if credentials.email != admin_email or credentials.password != admin_password:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid admin credentials.",
-        )
-    return {"success": True}
-
-
 # ─── Admin Login via Phone OTP ────────────────────────────────
 def _normalize_phone(p: str) -> str:
     """Strip spaces/dashes so '+966 5..' and '+9665..' compare equal."""
     return "".join(p.split()).replace("-", "")
+
+
+def _allowed_staff_phones() -> set:
+    """
+    Whitelisted staff numbers (normalized).
+    Reads STAFF_PHONES (comma-separated list) and falls back to the
+    legacy single STAFF_PHONE, so both env var names work.
+    """
+    raw = os.getenv("STAFF_PHONES") or os.getenv("STAFF_PHONE", "")
+    return {_normalize_phone(p) for p in raw.split(",") if p.strip()}
 
 
 @router.post("/admin/phone-verify")
@@ -166,13 +161,13 @@ def verify_admin_phone(data: AdminPhoneVerify):
     """
     Staff login via Firebase phone OTP.
     Verifies the Firebase ID token server-side, then checks the phone
-    number against the single whitelisted STAFF_PHONE.
+    number against the whitelisted staff numbers (STAFF_PHONES).
     """
-    staff_phone = os.getenv("STAFF_PHONE", "")
-    if not staff_phone:
+    allowed = _allowed_staff_phones()
+    if not allowed:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Staff phone not configured.",
+            detail="Staff phones not configured.",
         )
 
     try:
@@ -184,11 +179,19 @@ def verify_admin_phone(data: AdminPhoneVerify):
             detail=f"Invalid token: {str(e)}",
         )
 
-    phone = decoded.get("phone_number", "")
-    if _normalize_phone(phone) != _normalize_phone(staff_phone):
+    phone = _normalize_phone(decoded.get("phone_number", ""))
+    if phone not in allowed:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="This number is not authorized for staff access.",
         )
+
+    # Record this user as staff (a /staff/{uid} document). Firestore rules
+    # check for that document to grant order-queue access — this takes effect
+    # immediately, with no client ID-token refresh required.
+    try:
+        db.mark_staff(decoded["uid"], phone)
+    except Exception as e:
+        print(f"[AUTH] Failed to mark staff {decoded['uid']}: {e}")
 
     return {"success": True}
