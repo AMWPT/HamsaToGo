@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 from models.menu import (
     CategoryCreate, CategoryUpdate, CategoryResponse,
     MenuItemCreate, MenuItemUpdate, MenuItemResponse,
 )
 from services import firestore as db
+from dependencies import require_staff
 from typing import List, Optional
 
 router = APIRouter(prefix="/menu", tags=["Menu"])
@@ -13,7 +14,8 @@ router = APIRouter(prefix="/menu", tags=["Menu"])
 #  CATEGORIES
 # ═══════════════════════════════════════════════════════════════
 
-@router.post("/categories", response_model=CategoryResponse, status_code=201)
+@router.post("/categories", response_model=CategoryResponse, status_code=201,
+             dependencies=[Depends(require_staff)])
 def create_category(category: CategoryCreate):
     """Admin: Add a new category (e.g. Coffee, Food, Cold Drinks)."""
     data = db.create_category(category.model_dump())
@@ -23,24 +25,21 @@ def create_category(category: CategoryCreate):
 @router.get("/categories")
 def get_categories():
     """Get all categories ordered by sort_order."""
-    try:
-        categories = db.get_all_categories()
-        return [
-            {
-                "id": c["id"],
-                "name_en": c.get("name_en", ""),
-                "name_ar": c.get("name_ar", ""),
-                "icon": c.get("icon"),
-                "sort_order": c.get("sort_order", 0),
-            }
-            for c in categories
-        ]
-    except Exception as e:
-        import traceback
-        raise HTTPException(status_code=500, detail=traceback.format_exc())
+    categories = db.get_all_categories()
+    return [
+        {
+            "id": c["id"],
+            "name_en": c.get("name_en", ""),
+            "name_ar": c.get("name_ar", ""),
+            "icon": c.get("icon"),
+            "sort_order": c.get("sort_order", 0),
+        }
+        for c in categories
+    ]
 
 
-@router.patch("/categories/{category_id}", response_model=CategoryResponse)
+@router.patch("/categories/{category_id}", response_model=CategoryResponse,
+              dependencies=[Depends(require_staff)])
 def update_category(category_id: str, update: CategoryUpdate):
     """Admin: Update a category's name, icon, or sort order."""
     existing = db.get_category(category_id)
@@ -50,7 +49,8 @@ def update_category(category_id: str, update: CategoryUpdate):
     return CategoryResponse(**updated)
 
 
-@router.delete("/categories/{category_id}", status_code=204)
+@router.delete("/categories/{category_id}", status_code=204,
+               dependencies=[Depends(require_staff)])
 def delete_category(category_id: str):
     """Admin: Delete a category."""
     existing = db.get_category(category_id)
@@ -63,7 +63,8 @@ def delete_category(category_id: str):
 #  MENU ITEMS
 # ═══════════════════════════════════════════════════════════════
 
-@router.post("/items", response_model=MenuItemResponse, status_code=201)
+@router.post("/items", response_model=MenuItemResponse, status_code=201,
+             dependencies=[Depends(require_staff)])
 def create_menu_item(item: MenuItemCreate):
     """Admin: Add a new menu item with English and Arabic names."""
     # Verify the category exists
@@ -156,7 +157,8 @@ def get_menu_item(item_id: str):
     }
 
 
-@router.patch("/items/{item_id}", response_model=MenuItemResponse)
+@router.patch("/items/{item_id}", response_model=MenuItemResponse,
+              dependencies=[Depends(require_staff)])
 def update_menu_item(item_id: str, update: MenuItemUpdate):
     """Admin: Update a menu item (price, availability, names, etc.)."""
     existing = db.get_menu_item(item_id)
@@ -166,7 +168,8 @@ def update_menu_item(item_id: str, update: MenuItemUpdate):
     return MenuItemResponse(**updated)
 
 
-@router.patch("/items/{item_id}/toggle", response_model=MenuItemResponse)
+@router.patch("/items/{item_id}/toggle", response_model=MenuItemResponse,
+              dependencies=[Depends(require_staff)])
 def toggle_availability(item_id: str):
     """Admin: Quickly toggle an item's availability on/off."""
     existing = db.get_menu_item(item_id)
@@ -176,7 +179,8 @@ def toggle_availability(item_id: str):
     return MenuItemResponse(**updated)
 
 
-@router.delete("/items/{item_id}", status_code=204)
+@router.delete("/items/{item_id}", status_code=204,
+               dependencies=[Depends(require_staff)])
 def delete_menu_item(item_id: str):
     """Admin: Delete a menu item."""
     existing = db.get_menu_item(item_id)

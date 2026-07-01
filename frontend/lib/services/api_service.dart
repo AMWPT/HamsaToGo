@@ -1,5 +1,5 @@
 import 'package:dio/dio.dart';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../core/constants.dart';
 import '../models/user.dart';
 import '../models/menu_item.dart';
@@ -7,7 +7,6 @@ import '../models/order.dart';
 
 class ApiService {
   late final Dio _dio;
-  final _storage = const FlutterSecureStorage();
 
   ApiService() {
     _dio = Dio(BaseOptions(
@@ -17,16 +16,21 @@ class ApiService {
       headers: {'Content-Type': 'application/json'},
     ));
 
-    // Auth interceptor — attach token if present
+    // Auth interceptor — attach a FRESH Firebase ID token on each request.
+    // getIdToken() returns a cached token and auto-refreshes it when it's
+    // near expiry, so the backend always receives a valid, unexpired token.
     _dio.interceptors.add(InterceptorsWrapper(
       onRequest: (options, handler) async {
         // Don't overwrite a token explicitly supplied for this request
-        // (e.g. a freshly-minted ID token for account deletion).
+        // (e.g. a force-refreshed token for account deletion).
         if (options.headers['Authorization'] == null) {
-          final token = await _storage.read(key: StorageKeys.authToken);
-          if (token != null) {
-            options.headers['Authorization'] = 'Bearer $token';
-          }
+          try {
+            final token =
+                await FirebaseAuth.instance.currentUser?.getIdToken();
+            if (token != null) {
+              options.headers['Authorization'] = 'Bearer $token';
+            }
+          } catch (_) {}
         }
         handler.next(options);
       },

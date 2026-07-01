@@ -41,8 +41,8 @@ app = FastAPI(
 # ─── CORS ─────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # Restrict to your domain in production
-    allow_credentials=True,
+    allow_origins=["*"],       # mobile app has no browser origin; auth is via Bearer token
+    allow_credentials=False,   # no cookies — avoids the invalid "*" + credentials combo
     allow_methods=["*"],
     allow_headers=["*"],
 )
