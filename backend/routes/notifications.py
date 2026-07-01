@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from services import firestore as db
 from services.fcm import send_push_notification, get_customer_fcm_token
+from dependencies import require_user, require_staff
 
 router = APIRouter(prefix="/notifications", tags=["Notifications"])
 
@@ -22,11 +23,14 @@ class ManualNotification(BaseModel):
 
 # ─── Save FCM Token ───────────────────────────────────────────
 @router.post("/token")
-def save_token(payload: TokenUpdate):
+def save_token(payload: TokenUpdate, decoded: dict = Depends(require_user)):
     """
-    Save or update a customer's FCM device token.
+    Save or update the caller's own FCM device token.
     Called by the Flutter app every time it starts.
     """
+    if decoded["uid"] != payload.customer_id:
+        raise HTTPException(status_code=403, detail="You can only set your own token.")
+
     customer = db.get_user(payload.customer_id)
     if not customer:
         raise HTTPException(status_code=404, detail="Customer not found.")
@@ -36,7 +40,7 @@ def save_token(payload: TokenUpdate):
 
 
 # ─── Send Manual Notification (Admin) ────────────────────────
-@router.post("/send")
+@router.post("/send", dependencies=[Depends(require_staff)])
 def send_manual_notification(payload: ManualNotification):
     """
     Admin: Manually send a custom push notification to a customer.

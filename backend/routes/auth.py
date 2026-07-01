@@ -1,9 +1,10 @@
 import os
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from firebase_admin import auth as firebase_auth
 from models.user import PhoneVerifyRequest, UserUpdate, UserResponse, AdminPhoneVerify
 from services import firestore as db
 from services import postgres as pg
+from dependencies import require_user
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
@@ -61,7 +62,9 @@ def phone_verify(data: PhoneVerifyRequest):
 
 # ─── Get User Profile ─────────────────────────────────────────
 @router.get("/users/{user_id}")
-def get_user(user_id: str):
+def get_user(user_id: str, decoded: dict = Depends(require_user)):
+    if decoded["uid"] != user_id and not db.is_staff(decoded["uid"]):
+        raise HTTPException(status_code=403, detail="Not allowed.")
     user = db.get_user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
@@ -77,7 +80,9 @@ def get_user(user_id: str):
 
 # ─── Update User (FCM token / full name) ─────────────────────
 @router.patch("/users/{user_id}")
-def update_user(user_id: str, update: UserUpdate):
+def update_user(user_id: str, update: UserUpdate, decoded: dict = Depends(require_user)):
+    if decoded["uid"] != user_id:
+        raise HTTPException(status_code=403, detail="You can only update your own profile.")
     user = db.get_user(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
@@ -93,7 +98,7 @@ def update_user(user_id: str, update: UserUpdate):
 
 # ─── Delete Account ───────────────────────────────────────────
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_user(user_id: str, authorization: str = Header(None)):
+def delete_user(user_id: str, decoded: dict = Depends(require_user)):
     """
     Permanently delete a customer account.
     - Requires a valid Firebase ID token whose UID matches user_id, so a
@@ -102,21 +107,6 @@ def delete_user(user_id: str, authorization: str = Header(None)):
     - Removes/anonymizes the PostgreSQL analytics record.
     - Deletes the Firebase Auth user so they can no longer sign in.
     """
-    # Authenticate the caller and confirm they own this account
-    if not authorization or not authorization.startswith("Bearer "):
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing authentication token.",
-        )
-    token = authorization.split(" ", 1)[1]
-    try:
-        decoded = firebase_auth.verify_id_token(token, clock_skew_seconds=60)
-    except Exception as e:
-        print(f"[AUTH ERROR] Delete-account token verification failed: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Invalid token: {str(e)}",
-        )
     if decoded["uid"] != user_id:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

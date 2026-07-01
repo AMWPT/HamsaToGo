@@ -50,12 +50,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _tryRestoreSession() async {
     try {
+      // Wait for Firebase to restore any persisted session before making
+      // authenticated calls — currentUser is null briefly on cold start, and
+      // the backend now requires a valid ID token on protected endpoints.
+      final fbUser = FirebaseAuth.instance.currentUser ??
+          await FirebaseAuth.instance
+              .authStateChanges()
+              .first
+              .timeout(const Duration(seconds: 5), onTimeout: () => null);
+
       final isAdmin = await _storage.read(key: StorageKeys.isAdmin);
       if (isAdmin == 'true') {
-        // Staff access is enforced by Firestore rules at read time (via the
-        // /staff/{uid} doc). Just confirm a live Firebase session still backs
-        // it; if it's gone, drop to a clean logout rather than a dead dashboard.
-        if (FirebaseAuth.instance.currentUser != null) {
+        // Staff access is enforced by Firestore rules (the /staff/{uid} doc);
+        // just confirm a live Firebase session still backs it.
+        if (fbUser != null) {
           state = const AuthState(isAdmin: true);
           return;
         }
@@ -65,11 +73,13 @@ class AuthNotifier extends StateNotifier<AuthState> {
       }
 
       final userId = await _storage.read(key: StorageKeys.userId);
-      if (userId != null) {
+      if (userId != null && fbUser != null) {
         final user = await _api.getUser(userId);
         state = AuthState(user: user);
         return;
       }
+      // Stored session but no live Firebase user → clean it up.
+      if (userId != null) await _storage.deleteAll();
     } catch (_) {}
     state = const AuthState();
   }

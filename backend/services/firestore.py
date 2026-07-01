@@ -69,6 +69,12 @@ def mark_staff(uid: str, phone: str = "") -> None:
     db.collection(STAFF).document(uid).set({"phone": phone, "added_at": now()})
 
 
+def is_staff(uid: str) -> bool:
+    """True if a /staff/{uid} document exists for this user."""
+    db = get_firestore()
+    return db.collection(STAFF).document(uid).get().exists
+
+
 # ─── Categories ──────────────────────────────────────────────
 def create_category(data: dict) -> dict:
     db = get_firestore()
