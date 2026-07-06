@@ -1,0 +1,33 @@
+# Example operations. Data Connect generates typed APIs from these.
+# You can add more (analytics aggregations, mutations) once the schema
+# is deployed. These exist mainly so the connector is non-empty.
+
+# A customer's orders, newest first.
+query CustomerOrders($customerId: String!) @auth(level: NO_ACCESS) {
+  orders(
+    where: { customer: { id: { eq: $customerId } } }
+    orderBy: [{ createdAt: DESC }]
+  ) {
+    id
+    orderNumber
+    status
+    totalPrice
+    paymentMethod
+    createdAt
+  }
+}
+
+# All orders currently in the live queue (for the staff dashboard).
+query ActiveOrders @auth(level: NO_ACCESS) {
+  orders(
+    where: { status: { in: ["received", "in_progress", "ready"] } }
+    orderBy: [{ createdAt: ASC }]
+  ) {
+    id
+    orderNumber
+    customerName
+    status
+    totalPrice
+    createdAt
+  }
+}

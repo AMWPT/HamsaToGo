@@ -1,0 +1,8 @@
+connectorId: "hamsa"
+
+# Uncomment to generate typed client SDKs if you ever query Data Connect
+# directly from the Flutter app. Not needed just to create the schema.
+# generate:
+#   dartSdk:
+#     outputDir: "../../frontend/lib/dataconnect_generated"
+#     package: "hamsa_connect"

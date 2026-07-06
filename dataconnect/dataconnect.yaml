@@ -1,0 +1,22 @@
+specVersion: "v1"
+serviceId: "hamsacafe-1-service"
+
+# ⚠️ FILL THESE IN to match the Cloud SQL instance you provisioned:
+#   • location   = the region of your Cloud SQL instance (e.g. "us-central1"
+#                  or "me-central2"). Shown in the Firebase/Cloud console.
+#   • instanceId = the Cloud SQL instance ID (the short name, not the full
+#                  connection string).
+#   • database   = the database name inside that instance (default "postgres",
+#                  or whatever you named it).
+location: "europe-west3"
+
+schema:
+  source: "./schema"
+  datasource:
+    postgresql:
+      database: "hamsacafe-1-database"
+      cloudSql:
+        instanceId: "hamsacafe-1-instance"
+
+connectorDirs:
+  - "./connector"

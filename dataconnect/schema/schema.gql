@@ -1,0 +1,48 @@
+# ─── Hamsa To Go — Data Connect schema ───────────────────────
+# Each `type ... @table` becomes a PostgreSQL table in your Cloud SQL
+# instance. GraphQL fields are camelCase and map to snake_case columns
+# by default (e.g. fullName -> full_name). This mirrors the app's model:
+#
+#   Customer  1 ─── *  Order  1 ─── *  OrderItem
+#
+# A reference field (e.g. `customer: Customer!`) creates a foreign key.
+
+type Customer @table(name: "customers", key: ["id"]) {
+  id: String!                                   # Firebase UID (same id the app uses)
+  phone: String
+  fullName: String!
+  fcmToken: String
+  lang: String @default(value: "en")            # "en" | "ar"
+  totalOrders: Int! @default(value: 0)
+  totalSpent: Float! @default(value: 0)
+  createdAt: Timestamp! @default(expr: "request.time")
+  lastOrderAt: Timestamp
+}
+
+type Order @table(name: "orders", key: ["id"]) {
+  id: String!                                   # Firestore document id
+  orderNumber: Int64                            # sequential, 1-based (bigint)
+  customer: Customer!                           # → customer_id foreign key
+  customerName: String!
+  status: String! @default(value: "received")   # received | in_progress | ready | picked_up | cancelled
+  totalPrice: Float!
+  paymentMethod: String                         # mada | card | apple_pay | stc_pay
+  paymentId: String                             # Moyasar payment id (used for refunds)
+  notes: String @default(value: "")
+  createdAt: Timestamp! @default(expr: "request.time")
+  updatedAt: Timestamp! @default(expr: "request.time")
+  pickedUpAt: Timestamp
+}
+
+type OrderItem @table(name: "order_items") {
+  # No `key` given → Data Connect adds an auto-UUID primary key.
+  order: Order!                                 # → order_id foreign key
+  menuItemId: String!
+  nameEn: String!
+  nameAr: String!
+  quantity: Int!
+  unitPrice: Float!
+  subtotal: Float!
+  customizations: Any                           # JSON blob (jsonb) e.g. {"Size":"Large"}
+  notes: String @default(value: "")
+}
