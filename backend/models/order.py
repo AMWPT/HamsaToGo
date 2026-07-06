@@ -9,14 +9,15 @@ class OrderStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     READY      = "ready"
     PICKED_UP  = "picked_up"
+    CANCELLED  = "cancelled"
 
 
 class PaymentMethod(str, Enum):
     """Online payment methods (no cash — orders must be paid online)."""
-    MADA      = "mada"
-    CARD      = "card"        # Visa / Mastercard
-    APPLE_PAY = "apple_pay"
-    STC_PAY   = "stc_pay"
+    MADA        = "mada"
+    CARD        = "card"          # Visa / Mastercard
+    APPLE_PAY   = "apple_pay"
+    SAMSUNG_PAY = "samsung_pay"
 
 
 # ─── Order Item (snapshot of menu item at time of order) ─────
@@ -46,6 +47,7 @@ class OrderCreate(BaseModel):
     customer_name: str
     items: List[OrderItemCreate]
     payment_method: PaymentMethod        # required — orders are paid online
+    payment_id: str                      # Moyasar payment ID, verified server-side before order creation
     notes: str = ""
 
 
@@ -61,6 +63,7 @@ class OrderResponse(BaseModel):
     items: List[OrderItemResponse]
     status: OrderStatus
     payment_method: Optional[str] = None
+    payment_id: Optional[str] = None
     notes: str
     total_price: float
     created_at: Optional[datetime] = None

@@ -76,6 +76,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
                 const SizedBox(height: 20),
                 _AccountSheetTile(
+                  icon: Icons.description_outlined,
+                  label: isAr ? 'السياسات والشروط' : 'Policies & Terms',
+                  color: HamsaColors.cream,
+                  onTap: () {
+                    Navigator.of(sheetCtx).pop();
+                    context.push(AppRoutes.legal);
+                  },
+                ),
+                const SizedBox(height: 12),
+                _AccountSheetTile(
                   icon: Icons.logout_rounded,
                   label: isAr ? 'تسجيل الخروج' : 'Sign out',
                   color: HamsaColors.cream,

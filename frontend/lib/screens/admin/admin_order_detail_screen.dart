@@ -64,6 +64,7 @@ class _Body extends ConsumerWidget {
       OrderStatus.inProgress => HamsaColors.statusInProgress,
       OrderStatus.ready => HamsaColors.statusReady,
       OrderStatus.pickedUp => HamsaColors.statusPickedUp,
+      OrderStatus.cancelled => HamsaColors.error,
     };
 
     return Column(
@@ -298,13 +299,14 @@ class _Body extends ConsumerWidget {
           isAr ? 'تأكيد جاهزية الطلب للاستلام' : 'Mark as Ready for Pickup',
         OrderStatus.pickedUp =>
           isAr ? 'تأكيد استلام الطلب' : 'Mark as Picked Up',
+        OrderStatus.cancelled => '', // unreachable — cancelled has no "next"
       };
 
   IconData _paymentIcon(PaymentMethod? m) => switch (m) {
         PaymentMethod.mada => Icons.account_balance_rounded,
         PaymentMethod.card => Icons.credit_card_rounded,
         PaymentMethod.applePay => Icons.apple_rounded,
-        PaymentMethod.stcPay => Icons.account_balance_wallet_rounded,
+        PaymentMethod.samsungPay => Icons.account_balance_wallet_rounded,
         null => Icons.help_outline_rounded,
       };
 

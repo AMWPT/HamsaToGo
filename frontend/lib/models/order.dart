@@ -4,7 +4,8 @@ enum OrderStatus {
   received,
   inProgress,
   ready,
-  pickedUp;
+  pickedUp,
+  cancelled;
 
   static OrderStatus fromString(String s) {
     switch (s) {
@@ -16,6 +17,8 @@ enum OrderStatus {
         return ready;
       case 'picked_up':
         return pickedUp;
+      case 'cancelled':
+        return cancelled;
       default:
         return received;
     }
@@ -31,6 +34,8 @@ enum OrderStatus {
         return 'ready';
       case pickedUp:
         return 'picked_up';
+      case cancelled:
+        return 'cancelled';
     }
   }
 
@@ -44,6 +49,8 @@ enum OrderStatus {
         return 'Order Ready for Pickup';
       case pickedUp:
         return 'Order Picked Up';
+      case cancelled:
+        return 'Order Cancelled';
     }
   }
 
@@ -57,6 +64,8 @@ enum OrderStatus {
         return 'الطلب جاهز للاستلام';
       case pickedUp:
         return 'تم استلام الطلب';
+      case cancelled:
+        return 'تم إلغاء الطلب';
     }
   }
 
@@ -73,8 +82,13 @@ enum OrderStatus {
         return pickedUp;
       case pickedUp:
         return null;
+      case cancelled:
+        return null;
     }
   }
+
+  // Only 'received' orders can still be cancelled by the customer.
+  bool get isCancellable => this == received;
 
   int get step {
     switch (this) {
@@ -86,6 +100,8 @@ enum OrderStatus {
         return 2;
       case pickedUp:
         return 3;
+      case cancelled:
+        return -1; // not part of the linear progress timeline
     }
   }
 }
@@ -94,7 +110,7 @@ enum PaymentMethod {
   mada,
   card, // Visa / Mastercard
   applePay,
-  stcPay;
+  samsungPay;
 
   String toApiString() {
     switch (this) {
@@ -104,8 +120,8 @@ enum PaymentMethod {
         return 'card';
       case applePay:
         return 'apple_pay';
-      case stcPay:
-        return 'stc_pay';
+      case samsungPay:
+        return 'samsung_pay';
     }
   }
 
@@ -117,8 +133,8 @@ enum PaymentMethod {
         return card;
       case 'apple_pay':
         return applePay;
-      case 'stc_pay':
-        return stcPay;
+      case 'samsung_pay':
+        return samsungPay;
       default:
         return null;
     }
@@ -132,8 +148,8 @@ enum PaymentMethod {
         return 'Card';
       case applePay:
         return 'Apple Pay';
-      case stcPay:
-        return 'STC Pay';
+      case samsungPay:
+        return 'Samsung Pay';
     }
   }
 
@@ -145,8 +161,8 @@ enum PaymentMethod {
         return 'بطاقة';
       case applePay:
         return 'Apple Pay';
-      case stcPay:
-        return 'STC Pay';
+      case samsungPay:
+        return 'Samsung Pay';
     }
   }
 

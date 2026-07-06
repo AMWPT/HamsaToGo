@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../core/theme.dart';
 import '../../core/router.dart';
 import '../../models/order.dart';
+import '../../providers/auth_provider.dart';
 import '../../providers/locale_provider.dart';
 import '../../providers/order_provider.dart';
 import '../../widgets/hamsa_button.dart';
@@ -52,7 +53,7 @@ class OrderStatusScreen extends ConsumerWidget {
   }
 }
 
-class _OrderStatusBody extends StatelessWidget {
+class _OrderStatusBody extends ConsumerStatefulWidget {
   final Order order;
   final String locale;
   final bool isAr;
@@ -64,7 +65,85 @@ class _OrderStatusBody extends StatelessWidget {
   });
 
   @override
+  ConsumerState<_OrderStatusBody> createState() => _OrderStatusBodyState();
+}
+
+class _OrderStatusBodyState extends ConsumerState<_OrderStatusBody> {
+  bool _cancelling = false;
+
+  Future<void> _confirmAndCancel() async {
+    final isAr = widget.isAr;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: HamsaColors.bgSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          isAr ? 'إلغاء الطلب؟' : 'Cancel order?',
+          style: HamsaText.heading(size: 20),
+          textAlign: isAr ? TextAlign.right : TextAlign.left,
+        ),
+        content: Text(
+          isAr
+              ? 'سيتم إلغاء طلبك واسترجاع المبلغ المدفوع إلى وسيلة الدفع الأصلية.'
+              : 'Your order will be cancelled and the amount refunded to your original payment method.',
+          style: HamsaText.body(size: 14, color: HamsaColors.muted),
+          textAlign: isAr ? TextAlign.right : TextAlign.left,
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: Text(
+              isAr ? 'تراجع' : 'Never mind',
+              style: HamsaText.body(size: 14, color: HamsaColors.cream),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: Text(
+              isAr ? 'إلغاء الطلب' : 'Cancel order',
+              style: HamsaText.body(
+                size: 14,
+                weight: FontWeight.w700,
+                color: HamsaColors.error,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _cancelling = true);
+    try {
+      final api = ref.read(apiServiceProvider);
+      await api.cancelOrder(widget.order.id);
+      // The Firestore stream picks up the new 'cancelled' status automatically.
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isAr
+                ? 'تعذّر إلغاء الطلب. حاول مرة أخرى.'
+                : 'Could not cancel the order. Please try again.',
+          ),
+          backgroundColor: HamsaColors.error.withValues(alpha: 0.9),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _cancelling = false);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final order = widget.order;
+    final locale = widget.locale;
+    final isAr = widget.isAr;
     final status = order.status;
 
     return SingleChildScrollView(
@@ -85,10 +164,12 @@ class _OrderStatusBody extends StatelessWidget {
 
           const SizedBox(height: 40),
 
-          // Progress timeline
-          OrderProgressTimeline(currentStatus: status, isAr: isAr)
-              .animate(delay: 200.ms)
-              .fadeIn(duration: 400.ms),
+          // Progress timeline — not shown for cancelled orders since they
+          // fall outside the linear received → picked_up flow.
+          if (status != OrderStatus.cancelled)
+            OrderProgressTimeline(currentStatus: status, isAr: isAr)
+                .animate(delay: 200.ms)
+                .fadeIn(duration: 400.ms),
 
           const SizedBox(height: 36),
 
@@ -152,7 +233,17 @@ class _OrderStatusBody extends StatelessWidget {
 
           const SizedBox(height: 16),
 
-          if (status == OrderStatus.pickedUp)
+          if (status.isCancellable)
+            HamsaButton(
+              label: isAr ? 'إلغاء الطلب' : 'Cancel Order',
+              onTap: _cancelling ? null : _confirmAndCancel,
+              isLoading: _cancelling,
+              style: HamsaButtonStyle.secondary,
+            )
+                .animate(delay: 500.ms)
+                .fadeIn(duration: 350.ms),
+
+          if (status == OrderStatus.pickedUp || status == OrderStatus.cancelled)
             HamsaButton(
               label: isAr ? 'العودة للقائمة' : 'Back to Menu',
               onTap: () => context.go(AppRoutes.home),
@@ -182,6 +273,7 @@ class _StatusHero extends StatelessWidget {
       OrderStatus.inProgress => ('☕', HamsaColors.statusInProgress),
       OrderStatus.ready => ('✅', HamsaColors.statusReady),
       OrderStatus.pickedUp => ('🎉', HamsaColors.statusPickedUp),
+      OrderStatus.cancelled => ('❌', HamsaColors.error),
     };
 
     return Column(
@@ -242,6 +334,8 @@ class _StatusHero extends StatelessWidget {
           'طلبك جاهز! توجه للكاونتر',
         OrderStatus.pickedUp =>
           'تم استلام طلبك. شكراً!',
+        OrderStatus.cancelled =>
+          'تم إلغاء طلبك واسترجاع المبلغ المدفوع',
       };
     }
     return switch (s) {
@@ -249,6 +343,7 @@ class _StatusHero extends StatelessWidget {
         'We received your order and will start soon',
       OrderStatus.inProgress => 'Your order is being prepared',
       OrderStatus.ready => 'Ready at the counter — come pick it up!',
+      OrderStatus.cancelled => 'Your order was cancelled and refunded',
       OrderStatus.pickedUp => 'Enjoyed! Thanks for visiting Hamsa.',
     };
   }

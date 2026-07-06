@@ -132,6 +132,7 @@ class _HistoryCard extends StatelessWidget {
     final statusColor = switch (order.status) {
       OrderStatus.pickedUp => HamsaColors.greenAccent,
       OrderStatus.ready => HamsaColors.statusReady,
+      OrderStatus.cancelled => HamsaColors.error,
       _ => HamsaColors.muted,
     };
 

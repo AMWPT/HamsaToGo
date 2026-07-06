@@ -16,6 +16,7 @@ import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/admin/admin_order_detail_screen.dart';
 import '../screens/admin/menu_manager_screen.dart';
 import '../screens/admin/history_screen.dart';
+import '../screens/legal/legal_screen.dart';
 
 abstract class AppRoutes {
   static const splash = '/';
@@ -32,6 +33,7 @@ abstract class AppRoutes {
   static const adminOrderDetail = '/admin/orders/:id';
   static const menuManager = '/admin/menu';
   static const history = '/admin/history';
+  static const legal = '/legal';
 }
 
 class _AuthRouterNotifier extends ChangeNotifier {
@@ -56,6 +58,9 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuth = state.matchedLocation == AppRoutes.login ||
           state.matchedLocation == AppRoutes.register;
       final isAdminLogin = state.matchedLocation == AppRoutes.adminLogin;
+      final isLegal = state.matchedLocation == AppRoutes.legal;
+
+      if (isLegal) return null; // policies are public, reachable from anywhere
 
       if (authState.isAdmin) {
         if (isAdminLogin || isAuth || isSplash || isLanguage) {
@@ -143,6 +148,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.history,
         builder: (_, __) => const HistoryScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.legal,
+        builder: (_, __) => const LegalScreen(),
       ),
     ],
   );

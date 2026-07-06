@@ -293,6 +293,7 @@ class AdminOrderCard extends ConsumerWidget {
       OrderStatus.inProgress => HamsaColors.statusInProgress,
       OrderStatus.ready => HamsaColors.statusReady,
       OrderStatus.pickedUp => HamsaColors.statusPickedUp,
+      OrderStatus.cancelled => HamsaColors.error,
     };
 
     final nextStatus = status.next;
@@ -444,6 +445,7 @@ class AdminOrderCard extends ConsumerWidget {
         OrderStatus.inProgress => isAr ? 'بدء التحضير' : 'Start Preparing',
         OrderStatus.ready => isAr ? 'تأكيد الجاهزية' : 'Mark Ready',
         OrderStatus.pickedUp => isAr ? 'تأكيد الاستلام' : 'Mark Picked Up',
+        OrderStatus.cancelled => '', // unreachable — cancelled has no "next"
       };
 }
 

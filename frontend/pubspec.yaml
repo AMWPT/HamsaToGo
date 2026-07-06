@@ -31,6 +31,9 @@ dependencies:
   # Network
   dio: ^5.4.3+1
 
+  # Payments
+  moyasar: ^3.0.3
+
   # Storage
   shared_preferences: ^2.3.0
   flutter_secure_storage: ^9.2.2

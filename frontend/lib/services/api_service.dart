@@ -142,6 +142,7 @@ class ApiService {
     required String customerName,
     required List<CartItem> items,
     required PaymentMethod paymentMethod,
+    required String paymentId,
     String? notes,
   }) async {
     final res = await _dio.post('/orders/', data: {
@@ -149,6 +150,7 @@ class ApiService {
       'customer_name': customerName,
       'items': items.map((i) => i.toOrderItem().toJson()).toList(),
       'payment_method': paymentMethod.toApiString(),
+      'payment_id': paymentId,
       if (notes != null) 'notes': notes,
     });
     return Order.fromJson(res.data as Map<String, dynamic>);
@@ -188,6 +190,14 @@ class ApiService {
     final res = await _dio.patch('/orders/$orderId/status', data: {
       'status': status.toApiString(),
     });
+    return Order.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  /// Cancel an order and trigger a full refund. Only works while the
+  /// order is still in 'received' status — the backend rejects it once
+  /// preparation has started.
+  Future<Order> cancelOrder(String orderId) async {
+    final res = await _dio.post('/orders/$orderId/cancel');
     return Order.fromJson(res.data as Map<String, dynamic>);
   }
 

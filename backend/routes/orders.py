@@ -4,6 +4,7 @@ from services import firestore as db
 from services import postgres as pg
 from services.fcm import notify_order_status
 from dependencies import require_user, require_staff
+from services.moyasar import verify_payment, refund_payment, PaymentVerificationError, RefundError
 from typing import List, Optional
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
@@ -54,6 +55,14 @@ def place_order(order: OrderCreate, decoded: dict = Depends(require_user)):
                 detail=f"'{item.name_en}' is currently unavailable."
             )
         item.price = _authoritative_unit_price(menu_item, item.customizations)
+
+    # Verify the payment actually went through before creating the order —
+    # never trust the client's claim alone.
+    expected_total = sum(item.price * item.quantity for item in order.items)
+    try:
+        verify_payment(order.payment_id, expected_total)
+    except PaymentVerificationError as e:
+        raise HTTPException(status_code=402, detail=f"Payment verification failed: {e}")
 
     # Create the order in Firestore (store the method as a plain string)
     payload = order.model_dump()
@@ -113,6 +122,47 @@ def get_order(order_id: str, decoded: dict = Depends(require_user)):
     if order.get("customer_id") != decoded["uid"] and not db.is_staff(decoded["uid"]):
         raise HTTPException(status_code=403, detail="Not allowed.")
     return OrderResponse(**order)
+
+
+# ─── Cancel Order (Customer) ──────────────────────────────────
+@router.post("/{order_id}/cancel", response_model=OrderResponse)
+def cancel_order(order_id: str, decoded: dict = Depends(require_user)):
+    """
+    Customer: Cancel an order and receive a full refund.
+    Only the order's owner (or staff) may cancel it, and only while the
+    order is still 'received' — once staff has started preparing it, it
+    can no longer be cancelled.
+    """
+    order = db.get_order(order_id)
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found.")
+
+    if order.get("customer_id") != decoded["uid"] and not db.is_staff(decoded["uid"]):
+        raise HTTPException(status_code=403, detail="Not allowed.")
+
+    if order["status"] != OrderStatus.RECEIVED.value:
+        raise HTTPException(
+            status_code=400,
+            detail="Only orders that haven't started preparation can be cancelled.",
+        )
+
+    payment_id = order.get("payment_id")
+    if payment_id:
+        try:
+            refund_payment(payment_id)
+        except RefundError as e:
+            raise HTTPException(status_code=502, detail=f"Refund failed: {e}")
+
+    updated = db.update_order_status(order_id, OrderStatus.CANCELLED.value)
+    pg.update_order_status(order_id, OrderStatus.CANCELLED.value)
+
+    notify_order_status(
+        customer_id=order["customer_id"],
+        order_id=order_id,
+        status=OrderStatus.CANCELLED.value,
+    )
+
+    return OrderResponse(**updated)
 
 
 # ─── Update Order Status (Admin / Employee) ───────────────────

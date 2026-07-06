@@ -110,6 +110,7 @@ class OrderTimelineCard extends StatelessWidget {
       OrderStatus.inProgress => HamsaColors.statusInProgress,
       OrderStatus.ready => HamsaColors.statusReady,
       OrderStatus.pickedUp => HamsaColors.statusPickedUp,
+      OrderStatus.cancelled => HamsaColors.error,
     };
 
     return GestureDetector(

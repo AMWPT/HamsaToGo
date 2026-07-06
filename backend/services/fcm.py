@@ -30,6 +30,12 @@ STATUS_MESSAGES = {
         "body_en": "Thank you for your visit.",
         "body_ar": "شكراً لزيارتك.",
     },
+    "cancelled": {
+        "title_en": "Order cancelled",
+        "title_ar": "تم إلغاء الطلب",
+        "body_en": "Your order was cancelled and refunded.",
+        "body_ar": "تم إلغاء طلبك واسترجاع المبلغ.",
+    },
 }
 
 
