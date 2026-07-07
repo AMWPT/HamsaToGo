@@ -1,8 +1,9 @@
 // ─── API ─────────────────────────────────────────────────────
 abstract class ApiConstants {
-  /// Replace with your local IP when testing on a physical device,
-  /// or your deployed backend URL in production.
-  static const baseUrl = 'http://10.0.2.2:8080'; // Android emulator → localhost
+  /// Emulator uses 10.0.2.2 (alias for the host's localhost).
+  /// A physical device on the same Wi-Fi needs the PC's actual LAN IP
+  /// instead — swap back to 10.0.2.2 when testing on the emulator again.
+  static const baseUrl = 'http://192.168.0.118:8080';
 
   static const timeout = Duration(seconds: 15);
 }
