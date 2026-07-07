@@ -1,4 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'package:flutter/services.dart';
@@ -16,6 +18,17 @@ void main() async {
   try {
     await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform)
         .timeout(const Duration(seconds: 5));
+    // Play Integrity / App Attest prove requests come from the real,
+    // unmodified app — not a bot or a tampered APK. In debug builds this
+    // falls back to a debug token you register per-device in the console.
+    await FirebaseAppCheck.instance.activate(
+      androidProvider: kDebugMode
+          ? AndroidProvider.debug
+          : AndroidProvider.playIntegrity,
+      appleProvider: kDebugMode
+          ? AppleProvider.debug
+          : AppleProvider.appAttest,
+    );
     await FcmService.initialize(navigatorKey: navigatorKey);
   } catch (e) {
     debugPrint('Firebase init: $e');
