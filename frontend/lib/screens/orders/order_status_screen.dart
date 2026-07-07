@@ -44,7 +44,9 @@ class OrderStatusScreen extends ConsumerWidget {
         ),
         error: (err, _) => Center(
           child: Text(
-            'Error: $err',
+            isAr
+                ? 'تعذّر تحميل الطلب. حاول مرة أخرى.'
+                : 'Could not load the order. Please try again.',
             style: HamsaText.body(color: HamsaColors.muted),
           ),
         ),

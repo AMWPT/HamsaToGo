@@ -99,8 +99,13 @@ class _MenuManagerScreenState extends ConsumerState<MenuManagerScreen> {
                 child: CircularProgressIndicator(
                     color: HamsaColors.greenAccent),
               ),
-              error: (_, __) => const Center(
-                child: Text('Error', style: TextStyle(color: HamsaColors.muted)),
+              error: (_, __) => Center(
+                child: Text(
+                  isAr
+                      ? 'تعذّر تحميل عناصر القائمة. حاول مرة أخرى.'
+                      : 'Could not load menu items. Please try again.',
+                  style: const TextStyle(color: HamsaColors.muted),
+                ),
               ),
             ),
           ),
@@ -899,9 +904,13 @@ class _ItemFormSheetState extends ConsumerState<_ItemFormSheet> {
   }
 
   Future<void> _save(List<Category> cats) async {
+    final isAr = ref.read(localeProvider).languageCode == 'ar';
     if (_selectedCategoryId == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please choose a category')),
+        SnackBar(
+            content: Text(isAr
+                ? 'الرجاء اختيار تصنيف'
+                : 'Please choose a category')),
       );
       return;
     }
@@ -930,7 +939,10 @@ class _ItemFormSheetState extends ConsumerState<_ItemFormSheet> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(
+              content: Text(isAr
+                  ? 'تعذّر حفظ العنصر. حاول مرة أخرى.'
+                  : 'Could not save the item. Please try again.')),
         );
       }
     } finally {
@@ -977,8 +989,12 @@ class _ItemFormSheetState extends ConsumerState<_ItemFormSheet> {
       if (mounted) Navigator.of(context).pop();
     } catch (e) {
       if (mounted) {
+        final isAr = ref.read(localeProvider).languageCode == 'ar';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(
+              content: Text(isAr
+                  ? 'تعذّر حذف العنصر. حاول مرة أخرى.'
+                  : 'Could not remove the item. Please try again.')),
         );
       }
     } finally {

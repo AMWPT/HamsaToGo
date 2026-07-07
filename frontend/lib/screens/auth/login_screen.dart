@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/auth_errors.dart';
 import '../../core/theme.dart';
 import '../../core/router.dart';
 import '../../providers/auth_provider.dart';
@@ -31,6 +32,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _sending = false;     // waiting for SMS
   bool _verifying = false;   // waiting for backend
 
+  bool get _isAr => ref.read(localeProvider).languageCode == 'ar';
+
   @override
   void dispose() {
     _phoneCtrl.dispose();
@@ -51,7 +54,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _sendCode() async {
     final phone = _fullPhone;
     if (phone.length < 10) {
-      _showError('Please enter a valid phone number');
+      _showError(_isAr
+          ? 'الرجاء إدخال رقم جوال صحيح'
+          : 'Please enter a valid phone number');
       return;
     }
 
@@ -66,7 +71,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       },
       verificationFailed: (FirebaseAuthException e) {
         setState(() => _sending = false);
-        _showError(e.message ?? 'Failed to send code');
+        _showError(friendlyAuthError(
+          e,
+          isAr: _isAr,
+          fallbackEn: 'Could not send the code. Please try again.',
+          fallbackAr: 'تعذّر إرسال الرمز. حاول مرة أخرى.',
+        ));
       },
       codeSent: (String verificationId, int? resendToken) {
         setState(() {
@@ -85,7 +95,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _verifyCode() async {
     final code = _otpCtrl.text.trim();
     if (code.length != 6) {
-      _showError('Enter the 6-digit code');
+      _showError(_isAr
+          ? 'أدخل الرمز المكوّن من 6 أرقام'
+          : 'Enter the 6-digit code');
       return;
     }
     if (_verificationId == null) return;
@@ -100,7 +112,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       await _signInWithCredential(credential);
     } on FirebaseAuthException catch (e) {
       setState(() => _verifying = false);
-      _showError(e.message ?? 'Invalid code');
+      _showError(friendlyAuthError(
+        e,
+        isAr: _isAr,
+        fallbackEn: 'Could not verify the code. Please try again.',
+        fallbackAr: 'تعذّر التحقق من الرمز. حاول مرة أخرى.',
+      ));
     }
   }
 
@@ -120,23 +137,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         setState(() => _verifying = false);
         if (error == 'NO_ACCOUNT') {
           _showError(
-            'No account found. Please register first.',
+            _isAr
+                ? 'لا يوجد حساب بهذا الرقم. الرجاء إنشاء حساب أولاً.'
+                : 'No account found. Please register first.',
             action: SnackBarAction(
-              label: 'Register',
+              label: _isAr ? 'إنشاء حساب' : 'Register',
               textColor: HamsaColors.bgDeep,
               onPressed: () => context.go(AppRoutes.register),
             ),
           );
         } else {
-          _showError('Could not connect to server. Please try again.');
+          _showError(_isAr
+              ? 'تعذّر الاتصال بالخادم. حاول مرة أخرى.'
+              : 'Could not connect to server. Please try again.');
         }
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _verifying = false);
-      _showError(e.message ?? 'Verification failed');
+      _showError(friendlyAuthError(
+        e,
+        isAr: _isAr,
+        fallbackEn: 'Sign-in failed. Please try again.',
+        fallbackAr: 'تعذّر تسجيل الدخول. حاول مرة أخرى.',
+      ));
     } catch (e) {
       setState(() => _verifying = false);
-      _showError('Something went wrong. Try again.');
+      _showError(_isAr
+          ? 'حدث خطأ. حاول مجدداً.'
+          : 'Something went wrong. Try again.');
     }
   }
 

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/auth_errors.dart';
 import '../../core/theme.dart';
 import '../../core/router.dart';
 import '../../providers/auth_provider.dart';
@@ -28,6 +29,8 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   bool _sending  = false;
   bool _verifying = false;
 
+  bool get _isAr => ref.read(localeProvider).languageCode == 'ar';
+
   @override
   void dispose() {
     _nameCtrl.dispose();
@@ -46,10 +49,18 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   // ── Send OTP ─────────────────────────────────────────────────
   Future<void> _sendCode() async {
     final name = _nameCtrl.text.trim();
-    if (name.length < 2) { _showError('Please enter your full name'); return; }
+    if (name.length < 2) {
+      _showError(_isAr ? 'الرجاء إدخال الاسم الكامل' : 'Please enter your full name');
+      return;
+    }
 
     final phone = _fullPhone;
-    if (phone.length < 10) { _showError('Please enter a valid phone number'); return; }
+    if (phone.length < 10) {
+      _showError(_isAr
+          ? 'الرجاء إدخال رقم جوال صحيح'
+          : 'Please enter a valid phone number');
+      return;
+    }
 
     setState(() => _sending = true);
 
@@ -61,7 +72,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       },
       verificationFailed: (FirebaseAuthException e) {
         setState(() => _sending = false);
-        _showError(e.message ?? 'Failed to send code');
+        _showError(friendlyAuthError(
+          e,
+          isAr: _isAr,
+          fallbackEn: 'Could not send the code. Please try again.',
+          fallbackAr: 'تعذّر إرسال الرمز. حاول مرة أخرى.',
+        ));
       },
       codeSent: (String verificationId, int? resendToken) {
         setState(() {
@@ -79,7 +95,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   // ── Verify OTP ───────────────────────────────────────────────
   Future<void> _verifyCode() async {
     final code = _otpCtrl.text.trim();
-    if (code.length != 6) { _showError('Enter the 6-digit code'); return; }
+    if (code.length != 6) {
+      _showError(_isAr
+          ? 'أدخل الرمز المكوّن من 6 أرقام'
+          : 'Enter the 6-digit code');
+      return;
+    }
     if (_verificationId == null) return;
 
     setState(() => _verifying = true);
@@ -92,7 +113,12 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       await _signInWithCredential(credential);
     } on FirebaseAuthException catch (e) {
       setState(() => _verifying = false);
-      _showError(e.message ?? 'Invalid code');
+      _showError(friendlyAuthError(
+        e,
+        isAr: _isAr,
+        fallbackEn: 'Could not verify the code. Please try again.',
+        fallbackAr: 'تعذّر التحقق من الرمز. حاول مرة أخرى.',
+      ));
     }
   }
 
@@ -111,14 +137,25 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
       final error = ref.read(authProvider).error;
       if (error != null) {
         setState(() => _verifying = false);
-        _showError(error);
+        // The provider error is a technical string (backend detail or a
+        // Dio exception) — never show it raw to the customer.
+        _showError(_isAr
+            ? 'تعذّر إنشاء الحساب. حاول مرة أخرى.'
+            : 'Could not create your account. Please try again.');
       }
     } on FirebaseAuthException catch (e) {
       setState(() => _verifying = false);
-      _showError(e.message ?? 'Verification failed');
+      _showError(friendlyAuthError(
+        e,
+        isAr: _isAr,
+        fallbackEn: 'Sign-in failed. Please try again.',
+        fallbackAr: 'تعذّر تسجيل الدخول. حاول مرة أخرى.',
+      ));
     } catch (e) {
       setState(() => _verifying = false);
-      _showError('Something went wrong. Try again.');
+      _showError(_isAr
+          ? 'حدث خطأ. حاول مجدداً.'
+          : 'Something went wrong. Try again.');
     }
   }
 

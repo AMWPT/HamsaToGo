@@ -201,14 +201,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     }
 
     if (!mounted) return;
-    final error = ref.read(authProvider).error;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         backgroundColor: HamsaColors.bgElevated,
         content: Text(
           isAr
               ? 'تعذر حذف الحساب. حاول مرة أخرى.'
-              : error ?? 'Could not delete account. Please try again.',
+              : 'Could not delete account. Please try again.',
           style: HamsaText.body(size: 14, color: HamsaColors.cream),
         ),
       ),

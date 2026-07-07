@@ -41,8 +41,13 @@ class AdminOrderDetailScreen extends ConsumerWidget {
           child: CircularProgressIndicator(
               color: HamsaColors.greenAccent),
         ),
-        error: (_, __) => const Center(
-          child: Text('Error', style: TextStyle(color: HamsaColors.muted)),
+        error: (_, __) => Center(
+          child: Text(
+            isAr
+                ? 'تعذّر تحميل الطلب. حاول مرة أخرى.'
+                : 'Could not load the order. Please try again.',
+            style: const TextStyle(color: HamsaColors.muted),
+          ),
         ),
       ),
     );
@@ -281,8 +286,13 @@ class _Body extends ConsumerWidget {
       // watch the timeline advance and press the next step.
     } catch (e) {
       if (context.mounted) {
+        final isAr = ref.read(localeProvider).languageCode == 'ar';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString())),
+          SnackBar(
+            content: Text(isAr
+                ? 'تعذّر تحديث حالة الطلب. حاول مرة أخرى.'
+                : 'Could not update the order status. Please try again.'),
+          ),
         );
       }
     }
