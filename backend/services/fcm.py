@@ -5,13 +5,9 @@ USERS = "users"
 
 
 # ─── Per-status notification copy (EN + AR) ───────────────────
+# "received" (order placed) intentionally has no entry — the customer just
+# placed the order themselves, so no notification is sent for it.
 STATUS_MESSAGES = {
-    "received": {
-        "title_en": "Order received",
-        "title_ar": "تم استلام الطلب",
-        "body_en": "Your order has been received.",
-        "body_ar": "تم استلام طلبك.",
-    },
     "in_progress": {
         "title_en": "Order being prepared ☕",
         "title_ar": "جاري تحضير الطلب ☕",
@@ -39,6 +35,20 @@ STATUS_MESSAGES = {
 }
 
 
+# ─── Per-status notification sounds ───────────────────────────
+# Android 8+ binds the sound to the notification channel, so each sound has
+# its own channel (created in the app's MainActivity.kt); the android value
+# is both the channel id and the res/raw sound resource name. The ios value
+# is the .caf filename bundled in the Xcode Runner target.
+# Statuses not listed here (e.g. cancelled) fall back to the default sound
+# on the default "orders" channel.
+STATUS_SOUNDS = {
+    "in_progress": {"android": "order_being_prepared", "ios": "OrderBeingPreparedIOS.caf"},
+    "ready":       {"android": "order_ready",          "ios": "OrderReadyIOS.caf"},
+    "picked_up":   {"android": "order_picked_up",      "ios": "OrderPickedUpIOS.caf"},
+}
+
+
 def get_customer_doc(customer_id: str) -> dict | None:
     """Fetch the customer's profile document from Firestore."""
     db = get_firestore()
@@ -62,10 +72,15 @@ def send_push_notification(
     body_ar: str,
     data: dict = None,
     lang: str = "en",
+    android_sound: str = "default",
+    android_channel_id: str = "orders",
+    ios_sound: str = "default",
 ) -> bool:
     """
     Send a push notification via FCM.
     The customer's preferred language determines which title/body is sent.
+    [android_sound] doubles as the res/raw resource name (pre-Android-8
+    devices play it directly; on 8+ the channel's sound wins).
     """
     if not fcm_token:
         return False
@@ -84,13 +99,13 @@ def send_push_notification(
             android=messaging.AndroidConfig(
                 priority="high",
                 notification=messaging.AndroidNotification(
-                    sound="default",
-                    channel_id="orders",
+                    sound=android_sound,
+                    channel_id=android_channel_id,
                 ),
             ),
             apns=messaging.APNSConfig(
                 payload=messaging.APNSPayload(
-                    aps=messaging.Aps(sound="default"),
+                    aps=messaging.Aps(sound=ios_sound),
                 ),
             ),
         )
@@ -103,9 +118,11 @@ def send_push_notification(
 
 def notify_order_status(customer_id: str, order_id: str, status: str) -> bool:
     """
-    Notify a customer that their order moved to a new status.
+    Notify a customer that their order moved to a new status, with a
+    status-specific notification sound.
     Sends in the customer's preferred language (stored on their profile).
-    Fires for every status: received → in_progress → ready → picked_up.
+    Fires for in_progress → ready → picked_up (and cancelled); placing an
+    order ("received") sends no notification.
     """
     msg = STATUS_MESSAGES.get(status)
     if not msg:
@@ -121,6 +138,7 @@ def notify_order_status(customer_id: str, order_id: str, status: str) -> bool:
         return False
 
     lang = doc.get("lang", "en")
+    sound = STATUS_SOUNDS.get(status, {})
 
     return send_push_notification(
         fcm_token=token,
@@ -130,4 +148,7 @@ def notify_order_status(customer_id: str, order_id: str, status: str) -> bool:
         body_ar=msg["body_ar"],
         data={"order_id": order_id, "type": f"order_{status}", "status": status},
         lang=lang,
+        android_sound=sound.get("android", "default"),
+        android_channel_id=sound.get("android", "orders"),
+        ios_sound=sound.get("ios", "default"),
     )

@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../../core/auth_errors.dart';
 import '../../core/theme.dart';
 import '../../core/router.dart';
 import '../../providers/auth_provider.dart';
@@ -62,7 +63,12 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
       },
       verificationFailed: (FirebaseAuthException e) {
         setState(() => _sending = false);
-        _showError(e.message ?? (_isAr ? 'فشل إرسال الرمز' : 'Failed to send code'));
+        _showError(friendlyAuthError(
+          e,
+          isAr: _isAr,
+          fallbackEn: 'Could not send the code. Please try again.',
+          fallbackAr: 'تعذّر إرسال الرمز. حاول مرة أخرى.',
+        ));
       },
       codeSent: (String verificationId, int? resendToken) {
         setState(() {
@@ -96,7 +102,12 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
       await _signInWithCredential(credential);
     } on FirebaseAuthException catch (e) {
       setState(() => _verifying = false);
-      _showError(e.message ?? (_isAr ? 'رمز غير صحيح' : 'Invalid code'));
+      _showError(friendlyAuthError(
+        e,
+        isAr: _isAr,
+        fallbackEn: 'Could not verify the code. Please try again.',
+        fallbackAr: 'تعذّر التحقق من الرمز. حاول مرة أخرى.',
+      ));
     }
   }
 
@@ -122,7 +133,12 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
       // On success the router redirects to the admin dashboard automatically.
     } on FirebaseAuthException catch (e) {
       setState(() => _verifying = false);
-      _showError(e.message ?? (_isAr ? 'فشل التحقق' : 'Verification failed'));
+      _showError(friendlyAuthError(
+        e,
+        isAr: _isAr,
+        fallbackEn: 'Verification failed. Please try again.',
+        fallbackAr: 'فشل التحقق. حاول مرة أخرى.',
+      ));
     } catch (e) {
       setState(() => _verifying = false);
       _showError(_isAr ? 'حدث خطأ. حاول مجدداً.' : 'Something went wrong. Try again.');

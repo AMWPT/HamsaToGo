@@ -428,9 +428,12 @@ class AdminOrderCard extends ConsumerWidget {
       // Stream auto-updates — no manual refresh needed
     } catch (e) {
       if (context.mounted) {
+        final isAr = ref.read(localeProvider).languageCode == 'ar';
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text(isAr
+                ? 'تعذّر تحديث حالة الطلب. حاول مرة أخرى.'
+                : 'Could not update the order status. Please try again.'),
             backgroundColor: HamsaColors.error.withValues(alpha: 0.9),
           ),
         );

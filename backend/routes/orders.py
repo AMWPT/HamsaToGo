@@ -31,7 +31,8 @@ def place_order(order: OrderCreate, decoded: dict = Depends(require_user)):
     Customer places a new order.
     - Identity (customer_id/name) comes from the verified token, not the client.
     - Item prices are recomputed from the menu, never trusted from the client.
-    - Saves to Firestore with status = 'received' and notifies the customer.
+    - Saves to Firestore with status = 'received' (no push notification —
+      status-change pushes start once staff begins preparing).
     """
     # Identity from the token — a caller can only order as themselves.
     uid = decoded["uid"]
@@ -73,12 +74,8 @@ def place_order(order: OrderCreate, decoded: dict = Depends(require_user)):
     pg.insert_order(data)
     pg.insert_order_items(data["id"], data.get("items", []))
 
-    # Notify customer that order was received
-    notify_order_status(
-        customer_id=order.customer_id,
-        order_id=data["id"],
-        status="received",
-    )
+    # No notification here — the customer just placed the order themselves;
+    # pushes start when staff moves it to in_progress.
 
     return OrderResponse(**data)
 
