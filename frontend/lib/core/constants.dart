@@ -1,9 +1,14 @@
 // ─── API ─────────────────────────────────────────────────────
 abstract class ApiConstants {
-  /// Emulator uses 10.0.2.2 (alias for the host's localhost).
-  /// A physical device on the same Wi-Fi needs the PC's actual LAN IP
-  /// instead — swap back to 10.0.2.2 when testing on the emulator again.
-  static const baseUrl = 'http://192.168.0.118:8080';
+  /// Backend URL. Defaults to production (Cloud Run) so release builds
+  /// need no extra flags. For local development, override at run time:
+  ///
+  ///   Emulator:        flutter run --dart-define=API_URL=http://10.0.2.2:8080
+  ///   Physical device: flutter run --dart-define=API_URL=http://<PC-LAN-IP>:8080
+  static const baseUrl = String.fromEnvironment(
+    'API_URL',
+    defaultValue: 'https://hamsa-backend-269284588239.europe-west3.run.app',
+  );
 
   static const timeout = Duration(seconds: 15);
 }
