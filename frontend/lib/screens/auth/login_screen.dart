@@ -159,16 +159,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (error != null) {
         setState(() => _verifying = false);
         if (error == 'NO_ACCOUNT') {
-          _showError(
-            _isAr
-                ? 'لا يوجد حساب بهذا الرقم. الرجاء إنشاء حساب أولاً.'
-                : 'No account found. Please register first.',
-            action: SnackBarAction(
-              label: _isAr ? 'إنشاء حساب' : 'Register',
-              textColor: HamsaColors.bgDeep,
-              onPressed: () => context.go(AppRoutes.register),
-            ),
-          );
+          // The OTP is already verified and the Firebase session is live —
+          // don't send the user to the register screen (which would burn a
+          // SECOND SMS for the same phone). Just ask for their name and
+          // finish creating the account with the session we already have.
+          await _promptNameAndRegister();
         } else {
           _showError(_isAr
               ? 'تعذّر الاتصال بالخادم. حاول مرة أخرى.'
@@ -184,6 +179,108 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         fallbackAr: 'تعذّر تسجيل الدخول. حاول مرة أخرى.',
       ));
     } catch (e) {
+      setState(() => _verifying = false);
+      _showError(_isAr
+          ? 'حدث خطأ. حاول مجدداً.'
+          : 'Something went wrong. Try again.');
+    }
+  }
+
+  /// OTP verified but no account exists — collect a name and finish
+  /// registration with the already-verified Firebase session, so no
+  /// second OTP/SMS is ever needed.
+  Future<void> _promptNameAndRegister() async {
+    final isAr = _isAr;
+    final nameCtrl = TextEditingController();
+
+    final name = await showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: HamsaColors.bgSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          isAr ? 'أكمل إنشاء حسابك' : 'Complete your account',
+          style: HamsaText.heading(size: 20),
+          textAlign: isAr ? TextAlign.right : TextAlign.left,
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment:
+              isAr ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+          children: [
+            Text(
+              isAr
+                  ? 'تم التحقق من رقمك بنجاح. أدخل اسمك لإكمال التسجيل.'
+                  : 'Your number is verified. Enter your name to finish registering.',
+              style: HamsaText.body(size: 13, color: HamsaColors.muted),
+              textAlign: isAr ? TextAlign.right : TextAlign.left,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: nameCtrl,
+              autofocus: true,
+              textCapitalization: TextCapitalization.words,
+              textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+              style: isAr
+                  ? HamsaText.arabic(size: 15, color: HamsaColors.cream)
+                  : HamsaText.body(size: 15, color: HamsaColors.cream),
+              decoration: InputDecoration(
+                hintText: isAr ? 'الاسم الكامل' : 'Full name',
+                hintStyle: HamsaText.body(size: 14, color: HamsaColors.subtle),
+              ),
+            ),
+          ],
+        ),
+        actionsPadding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(null),
+            child: Text(
+              isAr ? 'إلغاء' : 'Cancel',
+              style: HamsaText.body(size: 14, color: HamsaColors.muted),
+            ),
+          ),
+          TextButton(
+            onPressed: () =>
+                Navigator.of(dialogCtx).pop(nameCtrl.text.trim()),
+            child: Text(
+              isAr ? 'إنشاء الحساب' : 'Create account',
+              style: HamsaText.body(
+                size: 14,
+                weight: FontWeight.w700,
+                color: HamsaColors.greenAccent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (name == null || name.isEmpty) return; // user cancelled
+
+    setState(() => _verifying = true);
+    try {
+      // Reuse the live Firebase session — a fresh token, no new OTP.
+      final idToken =
+          await FirebaseAuth.instance.currentUser?.getIdToken();
+      if (idToken == null) throw Exception('Session expired');
+
+      await ref
+          .read(authProvider.notifier)
+          .completePhoneAuth(idToken: idToken, fullName: name);
+
+      if (!mounted) return;
+      final error = ref.read(authProvider).error;
+      if (error != null) {
+        setState(() => _verifying = false);
+        _showError(_isAr
+            ? 'تعذّر إنشاء الحساب. حاول مرة أخرى.'
+            : 'Could not create the account. Please try again.');
+      }
+      // On success the router redirects to home automatically.
+    } catch (_) {
+      if (!mounted) return;
       setState(() => _verifying = false);
       _showError(_isAr
           ? 'حدث خطأ. حاول مجدداً.'
