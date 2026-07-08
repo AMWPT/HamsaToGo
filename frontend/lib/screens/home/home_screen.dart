@@ -238,6 +238,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   collapsed: _collapsed,
                   userName: auth.user?.fullName ?? '',
                   isAr: isAr,
+                  topPadding: MediaQuery.of(context).padding.top,
                   onOrdersTap: () => context.push(AppRoutes.myOrders),
                   onToggleLocale: () {
                     final next = isAr ? 'en' : 'ar';
@@ -333,6 +334,12 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   final VoidCallback onToggleLocale;
   final VoidCallback onAccountTap;
 
+  /// Status-bar height. The SafeArea inside the header consumes this from
+  /// the sliver's extent, so it must be added on top of the design heights —
+  /// otherwise the content area shrinks per-device and overflows by a few
+  /// pixels on phones with tall status bars.
+  final double topPadding;
+
   const _HomeHeaderDelegate({
     required this.collapsed,
     required this.userName,
@@ -340,12 +347,13 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
     required this.onOrdersTap,
     required this.onToggleLocale,
     required this.onAccountTap,
+    required this.topPadding,
   });
 
   @override
-  double get minExtent => 80;
+  double get minExtent => 80 + topPadding;
   @override
-  double get maxExtent => 180;
+  double get maxExtent => 180 + topPadding;
 
   @override
   Widget build(
@@ -439,7 +447,8 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
   bool shouldRebuild(_HomeHeaderDelegate old) =>
       old.collapsed != collapsed ||
       old.userName != userName ||
-      old.isAr != isAr;
+      old.isAr != isAr ||
+      old.topPadding != topPadding;
 }
 
 // ─── Action Buttons (language + orders + signout) ────────────
