@@ -53,8 +53,14 @@ def _get_conn():
         return None
     try:
         if _conn is None or _conn.closed:
-            params = _parse_db_url(url)
-            _conn = psycopg2.connect(**params, sslmode="require")
+            if "/cloudsql/" in url:
+                # Cloud Run → Cloud SQL over the built-in Unix socket.
+                # libpq parses the DSN directly; SSL doesn't apply to a socket.
+                _conn = psycopg2.connect(url)
+            else:
+                # TCP (local dev / public IP) — parse and require SSL.
+                params = _parse_db_url(url)
+                _conn = psycopg2.connect(**params, sslmode="require")
             _conn.autocommit = True
         return _conn
     except Exception as e:
