@@ -42,6 +42,14 @@ class ApiService {
 
   // ─── Auth ──────────────────────────────────────────────────
 
+  /// Check whether a customer account exists for this phone number,
+  /// BEFORE sending an OTP — avoids wasting an SMS (and burning the
+  /// Firebase rate limit) on unregistered numbers.
+  Future<bool> phoneExists(String phone) async {
+    final res = await _dio.get('/auth/exists', queryParameters: {'phone': phone});
+    return (res.data as Map<String, dynamic>)['exists'] == true;
+  }
+
   /// Called after Firebase phone OTP verification.
   /// [fullName] is required only for new users (register flow).
   Future<Map<String, dynamic>> phoneVerify({

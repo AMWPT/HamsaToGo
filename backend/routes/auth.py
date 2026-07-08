@@ -9,6 +9,21 @@ from dependencies import require_user
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
+# ─── Pre-OTP account check ────────────────────────────────────
+@router.get("/exists")
+def phone_exists(phone: str):
+    """
+    Lets the login screen check whether a phone number has a customer
+    account BEFORE sending an OTP, so no SMS is wasted (and no rate-limit
+    burned) on unregistered numbers.
+
+    Unauthenticated by necessity — the caller has no token yet. Response
+    is a bare boolean to keep the information exposure minimal.
+    """
+    normalized = _normalize_phone(phone)
+    return {"exists": db.user_exists_by_phone(normalized)}
+
+
 # ─── Phone OTP Verify (Sign In + Register) ───────────────────
 @router.post("/phone-verify")
 def phone_verify(data: PhoneVerifyRequest):

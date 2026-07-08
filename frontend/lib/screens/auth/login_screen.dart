@@ -62,6 +62,29 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     setState(() => _sending = true);
 
+    // Check the account exists BEFORE sending an OTP — otherwise an SMS
+    // is wasted (and rate limit burned) just to learn there's no account.
+    try {
+      final exists = await ref.read(apiServiceProvider).phoneExists(phone);
+      if (!exists) {
+        setState(() => _sending = false);
+        _showError(
+          _isAr
+              ? 'لا يوجد حساب بهذا الرقم. الرجاء إنشاء حساب أولاً.'
+              : 'No account found. Please register first.',
+          action: SnackBarAction(
+            label: _isAr ? 'إنشاء حساب' : 'Register',
+            textColor: HamsaColors.bgDeep,
+            onPressed: () => context.go(AppRoutes.register),
+          ),
+        );
+        return;
+      }
+    } catch (_) {
+      // Backend unreachable — fall through and let the normal OTP flow
+      // proceed; the post-verify check still catches missing accounts.
+    }
+
     await FirebaseAuth.instance.verifyPhoneNumber(
       phoneNumber: phone,
       timeout: const Duration(seconds: 60),

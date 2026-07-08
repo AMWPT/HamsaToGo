@@ -45,6 +45,13 @@ def get_user(uid: str) -> dict:
     return doc_to_dict(db.collection(USERS).document(uid).get())
 
 
+def user_exists_by_phone(phone: str) -> bool:
+    """True if a customer account is registered with this phone number."""
+    db = get_firestore()
+    docs = db.collection(USERS).where("phone", "==", phone).limit(1).get()
+    return len(docs) > 0
+
+
 def update_user(uid: str, data: dict) -> dict:
     db = get_firestore()
     data = {k: v for k, v in data.items() if v is not None}
