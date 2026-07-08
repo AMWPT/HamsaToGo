@@ -34,9 +34,16 @@ class LanguageScreen extends ConsumerWidget {
           ),
 
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
+            // Scrolls only when a short screen squeezes the content;
+            // otherwise the Spacers keep the original layout.
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: ConstrainedBox(
+                  constraints:
+                      BoxConstraints(minHeight: constraints.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Column(
                 children: [
                   const SizedBox(height: 32),
 
@@ -135,6 +142,9 @@ class LanguageScreen extends ConsumerWidget {
 
                   const SizedBox(height: 32),
                 ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),

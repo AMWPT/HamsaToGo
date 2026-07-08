@@ -182,9 +182,16 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
           ),
 
           SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 36),
-              child: Column(
+            // Scrolls only when the keyboard (or a short screen) squeezes
+            // the content; otherwise the Spacers keep the original layout.
+            child: LayoutBuilder(
+              builder: (context, constraints) => SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 36),
+                child: ConstrainedBox(
+                  constraints:
+                      BoxConstraints(minHeight: constraints.maxHeight),
+                  child: IntrinsicHeight(
+                    child: Column(
                 children: [
                   const SizedBox(height: 24),
 
@@ -299,6 +306,9 @@ class _AdminLoginScreenState extends ConsumerState<AdminLoginScreen> {
 
                   const SizedBox(height: 32),
                 ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
