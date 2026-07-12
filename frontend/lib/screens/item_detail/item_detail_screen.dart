@@ -1,3 +1,4 @@
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -39,9 +40,10 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
   late final Future<MenuItem> _itemFuture =
       ref.read(apiServiceProvider).getMenuItem(widget.itemId);
 
-  /// Total price modifier from selected options (e.g. +5 for coconut milk)
+  /// Total signed price modifier from selected options and crop
+  /// (e.g. +5 for coconut milk, -3 for a discounted crop).
   double _calcModifier(MenuItem item) {
-    double extra = 0;
+    double extra = _selectedCrop?.priceModifier ?? 0;
     for (final opt in item.options) {
       final chosen = _selectedOptions[opt.name];
       if (chosen != null) {
@@ -81,8 +83,8 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
       final chosen = _selectedOptions[opt.name];
       if (chosen == null || chosen.isEmpty) {
         _showRequiredError(isAr
-            ? 'الرجاء اختيار: ${opt.name}'
-            : 'Please choose: ${opt.name}');
+            ? 'الرجاء اختيار: ${opt.displayName(locale)}'
+            : 'Please choose: ${opt.displayName(locale)}');
         return;
       }
     }
@@ -182,6 +184,29 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                   child: ListView(
                     padding: const EdgeInsets.fromLTRB(28, 24, 28, 32),
                     children: [
+                      // Photo — all item images share the same 4:3 frame
+                      if (item.imageUrl != null) ...[
+                        Hero(
+                          tag: widget.heroTag ?? 'item-${item.id}',
+                          child: AspectRatio(
+                            aspectRatio: 4 / 3,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(20),
+                              child: CachedNetworkImage(
+                                imageUrl: item.imageUrl!,
+                                fit: BoxFit.cover,
+                                placeholder: (_, __) => Container(
+                                  color: HamsaColors.bgCard,
+                                ),
+                                errorWidget: (_, __, ___) =>
+                                    const SizedBox.shrink(),
+                              ),
+                            ),
+                          ),
+                        ).animate().fadeIn(duration: 400.ms),
+                        const SizedBox(height: 24),
+                      ],
+
                       // Name + base price row
                       Row(
                         textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
@@ -206,9 +231,9 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                                 'SAR ${unitPrice.toStringAsFixed(0)}',
                                 style: HamsaText.price(size: 26),
                               ),
-                              if (modifier > 0)
+                              if (modifier != 0)
                                 Text(
-                                  '+${modifier.toStringAsFixed(0)} SAR',
+                                  '${modifier > 0 ? '+' : '-'}${modifier.abs().toStringAsFixed(0)} SAR',
                                   style: HamsaText.body(
                                     size: 13,
                                     color: HamsaColors.greenAccent,
@@ -246,6 +271,7 @@ class _ItemDetailScreenState extends ConsumerState<ItemDetailScreen> {
                               option: option,
                               selected: _selectedOptions[option.name],
                               isAr: isAr,
+                              locale: locale,
                               onSelect: (choice) =>
                                   setState(() {
                                     _selectedOptions[option.name] = choice;
@@ -375,7 +401,9 @@ class _CropSelector extends StatelessWidget {
                   ),
                 ),
                 child: Text(
-                  crop.name(locale),
+                  crop.priceModifier == 0
+                      ? crop.name(locale)
+                      : '${crop.name(locale)} (${crop.priceModifier > 0 ? '+' : '-'}${crop.priceModifier.abs() % 1 == 0 ? crop.priceModifier.abs().toStringAsFixed(0) : crop.priceModifier.abs().toStringAsFixed(2)} SAR)',
                   style: isAr
                       ? HamsaText.arabic(
                           size: 15,
@@ -407,12 +435,14 @@ class _OptionGroup extends StatelessWidget {
   final MenuOption option;
   final String? selected;
   final bool isAr;
+  final String locale;
   final void Function(String) onSelect;
 
   const _OptionGroup({
     required this.option,
     required this.selected,
     required this.isAr,
+    required this.locale,
     required this.onSelect,
   });
 
@@ -429,7 +459,7 @@ class _OptionGroup extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                option.name,
+                option.displayName(locale),
                 style: HamsaText.body(
                   size: 15,
                   weight: FontWeight.w600,
@@ -449,7 +479,12 @@ class _OptionGroup extends StatelessWidget {
             spacing: 10,
             runSpacing: 10,
             textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
-            children: option.choices.map((choice) {
+            children: option.choices.asMap().entries.map((entry) {
+              // Selection is keyed by the canonical (English) label so the
+              // price modifiers and backend pricing keep working; only the
+              // visible text is localized.
+              final choice = entry.value;
+              final display = option.displayChoice(entry.key, locale);
               final isSelected = selected == choice;
               return GestureDetector(
                 onTap: () => onSelect(choice),
@@ -473,7 +508,7 @@ class _OptionGroup extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        choice,
+                        display,
                         style: HamsaText.body(
                           size: 15,
                           color: isSelected
