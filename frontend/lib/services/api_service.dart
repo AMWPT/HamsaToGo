@@ -102,6 +102,25 @@ class ApiService {
         .toList();
   }
 
+  Future<Category> createCategory({
+    required String nameEn,
+    required String nameAr,
+    String? icon,
+    int sortOrder = 0,
+  }) async {
+    final res = await _dio.post('/menu/categories', data: {
+      'name_en': nameEn,
+      'name_ar': nameAr,
+      if (icon != null && icon.isNotEmpty) 'icon': icon,
+      'sort_order': sortOrder,
+    });
+    return Category.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<void> deleteCategory(String categoryId) async {
+    await _dio.delete('/menu/categories/$categoryId');
+  }
+
   Future<List<MenuItem>> getMenuItems({
     String? categoryId,
     bool availableOnly = true,
@@ -141,6 +160,25 @@ class ApiService {
 
   Future<void> deleteMenuItem(String itemId) async {
     await _dio.delete('/menu/items/$itemId');
+  }
+
+  /// Upload an item photo from the admin's library. The backend normalizes
+  /// it to a consistent size, so any image works.
+  Future<MenuItem> uploadItemImage(String itemId, String filePath) async {
+    final form = FormData.fromMap({
+      'file': await MultipartFile.fromFile(filePath),
+    });
+    final res = await _dio.post(
+      '/menu/items/$itemId/image',
+      data: form,
+      options: Options(contentType: Headers.multipartFormDataContentType),
+    );
+    return MenuItem.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  Future<MenuItem> removeItemImage(String itemId) async {
+    final res = await _dio.delete('/menu/items/$itemId/image');
+    return MenuItem.fromJson(res.data as Map<String, dynamic>);
   }
 
   // ─── Orders ────────────────────────────────────────────────

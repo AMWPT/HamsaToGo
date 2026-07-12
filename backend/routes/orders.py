@@ -13,7 +13,8 @@ router = APIRouter(prefix="/orders", tags=["Orders"])
 def _authoritative_unit_price(menu_item: dict, customizations: dict) -> float:
     """
     Compute an item's unit price from the menu (never trust the client).
-    Base price + any selected option's price modifier.
+    Base price + any selected option's price modifier + the chosen
+    crop's price modifier. Modifiers are signed (negatives discount).
     """
     price = float(menu_item.get("price", 0.0))
     for opt in menu_item.get("options", []):
@@ -21,6 +22,15 @@ def _authoritative_unit_price(menu_item: dict, customizations: dict) -> float:
         chosen = (customizations or {}).get(opt.get("name"))
         if chosen and chosen in mods:
             price += float(mods[chosen])
+
+    # The chosen crop is stored under the "Crop" key with its localized
+    # name, so match against both languages.
+    chosen_crop = (customizations or {}).get("Crop")
+    if chosen_crop:
+        for crop in menu_item.get("crops", []):
+            if chosen_crop in (crop.get("name_en"), crop.get("name_ar")):
+                price += float(crop.get("price_modifier", 0) or 0)
+                break
     return price
 
 

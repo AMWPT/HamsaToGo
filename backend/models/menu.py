@@ -4,16 +4,19 @@ from typing import Optional, List, Dict
 
 # ─── Option (e.g. Size: Small / Medium / Large) ──────────────
 class MenuOption(BaseModel):
-    name: str                          # "Milk"
+    name: str                          # "Milk" (canonical — used as the key in order customizations)
+    name_ar: str = ""                  # "الحليب" (display only; falls back to name)
     choices: List[str]                 # ["Full Fat Milk", "Coconut Milk (+5 SAR)"]
+    choices_ar: List[str] = []         # Arabic display labels, parallel to choices
     required: bool = False
-    price_modifiers: Dict[str, float] = {}   # {"Coconut Milk (+5 SAR)": 5.0}
+    price_modifiers: Dict[str, float] = {}   # {"Coconut Milk (+5 SAR)": 5.0} — signed; negatives discount
 
 
 # ─── Coffee Crop (origin the customer must pick) ─────────────
 class Crop(BaseModel):
     name_en: str                       # "Brazilian"
     name_ar: str                       # "برازيلي"
+    price_modifier: float = 0          # signed SAR added to the item price
 
 
 # ─── Category ────────────────────────────────────────────────

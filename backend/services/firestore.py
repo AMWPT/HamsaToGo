@@ -162,6 +162,14 @@ def update_menu_item(item_id: str, data: dict) -> dict:
     return get_menu_item(item_id)
 
 
+def clear_menu_item_image(item_id: str) -> dict:
+    """Remove an item's photo. Separate from update_menu_item because that
+    helper drops None values, which would make image_url impossible to unset."""
+    db = get_firestore()
+    db.collection(MENU_ITEMS).document(item_id).update({"image_url": None})
+    return get_menu_item(item_id)
+
+
 def delete_menu_item(item_id: str):
     db = get_firestore()
     db.collection(MENU_ITEMS).document(item_id).delete()

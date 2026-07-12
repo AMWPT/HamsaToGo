@@ -89,7 +89,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       phoneNumber: phone,
       timeout: const Duration(seconds: 60),
       verificationCompleted: (PhoneAuthCredential credential) async {
-        // Android auto-retrieval
+        // Android auto-retrieval read the SMS itself. Mark the flow busy so
+        // a manual "Verify" tap can't race it — the second attempt would
+        // consume an already-used code and flash a "code expired" error.
+        if (_verifying) return;
+        setState(() => _verifying = true);
         await _signInWithCredential(credential);
       },
       verificationFailed: (FirebaseAuthException e) {
@@ -116,6 +120,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
   // ── Verify OTP ───────────────────────────────────────────────
   Future<void> _verifyCode() async {
+    if (_verifying) return; // auto-retrieval already signing in
     final code = _otpCtrl.text.trim();
     if (code.length != 6) {
       _showError(_isAr
@@ -171,7 +176,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         }
       }
     } on FirebaseAuthException catch (e) {
+      if (!mounted) return;
       setState(() => _verifying = false);
+      // If the parallel auto-retrieval sign-in already succeeded, this
+      // failure is just the losing side of the race — don't surface it.
+      if (ref.read(authProvider).isAuthenticated) return;
       _showError(friendlyAuthError(
         e,
         isAr: _isAr,
@@ -179,7 +188,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         fallbackAr: 'تعذّر تسجيل الدخول. حاول مرة أخرى.',
       ));
     } catch (e) {
+      if (!mounted) return;
       setState(() => _verifying = false);
+      if (ref.read(authProvider).isAuthenticated) return;
       _showError(_isAr
           ? 'حدث خطأ. حاول مجدداً.'
           : 'Something went wrong. Try again.');

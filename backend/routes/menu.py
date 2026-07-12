@@ -1,9 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import (
+    APIRouter, Depends, File, HTTPException, Query, UploadFile, status,
+)
 from models.menu import (
     CategoryCreate, CategoryUpdate, CategoryResponse,
     MenuItemCreate, MenuItemUpdate, MenuItemResponse,
 )
 from services import firestore as db
+from services import images
 from dependencies import require_staff
 from typing import List, Optional
 
@@ -96,14 +99,20 @@ def get_menu_items(
         clean_options = [
             {
                 "name": o.get("name", ""),
+                "name_ar": o.get("name_ar", ""),
                 "choices": o.get("choices", []),
+                "choices_ar": o.get("choices_ar", []),
                 "required": o.get("required", False),
                 "price_modifiers": o.get("price_modifiers", {}),
             }
             for o in raw_options
         ]
         clean_crops = [
-            {"name_en": c.get("name_en", ""), "name_ar": c.get("name_ar", "")}
+            {
+                "name_en": c.get("name_en", ""),
+                "name_ar": c.get("name_ar", ""),
+                "price_modifier": c.get("price_modifier", 0),
+            }
             for c in i.get("crops", [])
         ]
         result.append({
@@ -132,14 +141,20 @@ def get_menu_item(item_id: str):
     clean_options = [
         {
             "name": o.get("name", ""),
+            "name_ar": o.get("name_ar", ""),
             "choices": o.get("choices", []),
+            "choices_ar": o.get("choices_ar", []),
             "required": o.get("required", False),
             "price_modifiers": o.get("price_modifiers", {}),
         }
         for o in raw_options
     ]
     clean_crops = [
-        {"name_en": c.get("name_en", ""), "name_ar": c.get("name_ar", "")}
+        {
+            "name_en": c.get("name_en", ""),
+            "name_ar": c.get("name_ar", ""),
+            "price_modifier": c.get("price_modifier", 0),
+        }
         for c in i.get("crops", [])
     ]
     return {
@@ -182,8 +197,55 @@ def toggle_availability(item_id: str):
 @router.delete("/items/{item_id}", status_code=204,
                dependencies=[Depends(require_staff)])
 def delete_menu_item(item_id: str):
-    """Admin: Delete a menu item."""
+    """Admin: Delete a menu item (and its photo, if any)."""
     existing = db.get_menu_item(item_id)
     if not existing:
         raise HTTPException(status_code=404, detail="Menu item not found.")
+    images.delete_by_url(existing.get("image_url") or "")
     db.delete_menu_item(item_id)
+
+
+# ═══════════════════════════════════════════════════════════════
+#  MENU ITEM IMAGES
+# ═══════════════════════════════════════════════════════════════
+
+MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10 MB upload cap
+
+
+@router.post("/items/{item_id}/image", response_model=MenuItemResponse,
+             dependencies=[Depends(require_staff)])
+async def upload_item_image(item_id: str, file: UploadFile = File(...)):
+    """
+    Admin: attach a photo to a menu item. Whatever the admin picks is
+    normalized server-side to a consistent 1200x900 JPEG (center-cropped),
+    so every item photo has identical dimensions in the app.
+    """
+    existing = db.get_menu_item(item_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Menu item not found.")
+
+    raw = await file.read()
+    if len(raw) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413,
+                            detail="Image too large (max 10 MB).")
+    try:
+        url = images.process_and_upload(item_id, raw)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Not a valid image file.")
+
+    # Clean up the previous image, then point the item at the new one.
+    images.delete_by_url(existing.get("image_url") or "")
+    updated = db.update_menu_item(item_id, {"image_url": url})
+    return MenuItemResponse(**updated)
+
+
+@router.delete("/items/{item_id}/image", response_model=MenuItemResponse,
+               dependencies=[Depends(require_staff)])
+def remove_item_image(item_id: str):
+    """Admin: remove a menu item's photo."""
+    existing = db.get_menu_item(item_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="Menu item not found.")
+    images.delete_by_url(existing.get("image_url") or "")
+    updated = db.clear_menu_item_image(item_id)
+    return MenuItemResponse(**updated)
