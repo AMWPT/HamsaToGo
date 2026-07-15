@@ -39,21 +39,36 @@ class _AdminDashboardScreenState
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isAr ? 'لوحة التحكم' : 'Dashboard',
-                          style: HamsaText.display(
-                              size: 32, color: HamsaColors.cream),
-                        ),
-                        Text(
-                          isAr ? 'قائمة الطلبات المباشرة' : 'Live order queue',
-                          style: HamsaText.body(
-                              size: 13, color: HamsaColors.muted),
-                        ),
-                      ],
-                    ).animate().fadeIn(duration: 400.ms),
+                    // Expanded so the title never collides with the nav
+                    // icons on narrow screens (long Arabic titles overflow
+                    // otherwise).
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerLeft,
+                            child: Text(
+                              isAr ? 'لوحة التحكم' : 'Dashboard',
+                              maxLines: 1,
+                              style: HamsaText.display(
+                                  size: 32, color: HamsaColors.cream),
+                            ),
+                          ),
+                          Text(
+                            isAr
+                                ? 'قائمة الطلبات المباشرة'
+                                : 'Live order queue',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: HamsaText.body(
+                                size: 13, color: HamsaColors.muted),
+                          ),
+                        ],
+                      ).animate().fadeIn(duration: 400.ms),
+                    ),
+                    const SizedBox(width: 12),
 
                     // Nav icons
                     Row(
@@ -261,10 +276,16 @@ class _StatChip extends StatelessWidget {
             style: HamsaText.display(size: 28, color: color),
           ),
           const SizedBox(height: 2),
-          Text(
-            label,
-            style:
-                HamsaText.body(size: 11, color: color.withValues(alpha: 0.7)),
+          // FittedBox: labels like "Preparing" can exceed a quarter-width
+          // chip on narrow phones — scale down instead of overflowing.
+          FittedBox(
+            fit: BoxFit.scaleDown,
+            child: Text(
+              label,
+              maxLines: 1,
+              style: HamsaText.body(
+                  size: 11, color: color.withValues(alpha: 0.7)),
+            ),
           ),
         ],
       ),

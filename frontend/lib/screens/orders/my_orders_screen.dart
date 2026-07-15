@@ -158,13 +158,18 @@ class OrderTimelineCard extends StatelessWidget {
                   mainAxisAlignment:
                       MainAxisAlignment.spaceBetween,
                   children: [
-                    Column(
+                    // Expanded so long dates/labels can't collide with the
+                    // status chip column on narrow screens.
+                    Expanded(
+                      child: Column(
                       crossAxisAlignment: isAr
                           ? CrossAxisAlignment.end
                           : CrossAxisAlignment.start,
                       children: [
                         Text(
                           '${isAr ? "طلب" : "Order"} #${order.displayNumber}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: HamsaText.body(
                             size: 13,
                             weight: FontWeight.w600,
@@ -174,17 +179,23 @@ class OrderTimelineCard extends StatelessWidget {
                         const SizedBox(height: 4),
                         Text(
                           '${order.items.length} ${isAr ? "عنصر" : "item(s)"}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: HamsaText.body(
                               size: 12, color: HamsaColors.muted),
                         ),
                         const SizedBox(height: 2),
                         Text(
                           _formatDate(order.createdAt, isAr),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: HamsaText.body(
                               size: 11, color: HamsaColors.subtle),
                         ),
                       ],
+                      ),
                     ),
+                    const SizedBox(width: 10),
                     Column(
                       crossAxisAlignment: isAr
                           ? CrossAxisAlignment.start

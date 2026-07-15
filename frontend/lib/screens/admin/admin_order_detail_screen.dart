@@ -94,22 +94,31 @@ class _Body extends ConsumerWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Column(
+                      // Expanded so the order number/time can't collide
+                      // with the status chip on narrow screens.
+                      Expanded(
+                        child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             '#${order.displayNumber}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: HamsaText.heading(
                                 size: 22, color: HamsaColors.cream),
                           ),
                           const SizedBox(height: 4),
                           Text(
                             _timeAgo(order.createdAt, isAr),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                             style: HamsaText.body(
                                 size: 12, color: HamsaColors.muted),
                           ),
                         ],
+                        ),
                       ),
+                      const SizedBox(width: 10),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 14, vertical: 8),

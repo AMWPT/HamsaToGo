@@ -79,9 +79,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     ),
                     Expanded(
                       child: Column(
-                        crossAxisAlignment: isAr
-                            ? CrossAxisAlignment.end
-                            : CrossAxisAlignment.start,
+                        // The app is RTL-wide in Arabic, so `start` already
+                        // resolves to the right edge — flipping to `end`
+                        // here would double-flip back to the left.
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             isAr ? 'الدفع بالبطاقة' : 'Card Payment',
