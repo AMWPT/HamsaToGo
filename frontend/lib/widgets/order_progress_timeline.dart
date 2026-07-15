@@ -39,8 +39,10 @@ class OrderProgressTimeline extends StatelessWidget {
             textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Dot + label
-              Column(
+              // Dot + label — Flexible so the fixed-width label can shrink
+              // instead of overflowing on very narrow screens.
+              Flexible(
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   AnimatedContainer(
@@ -89,6 +91,7 @@ class OrderProgressTimeline extends StatelessWidget {
                     ),
                   ),
                 ],
+                ),
               ),
 
               // Connector line (not on last)

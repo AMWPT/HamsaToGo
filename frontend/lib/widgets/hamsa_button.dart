@@ -122,13 +122,22 @@ class _HamsaButtonState extends State<HamsaButton>
                         Icon(widget.icon, color: fg, size: 18),
                         const SizedBox(width: 8),
                       ],
-                      Text(
-                        widget.label,
-                        style: HamsaText.body(
-                          size: 15,
-                          weight: FontWeight.w600,
-                          color: fg,
-                          letterSpacing: 0.3,
+                      // Flexible + FittedBox: long labels (especially
+                      // Arabic) scale down slightly on narrow phones
+                      // instead of overflowing the button.
+                      Flexible(
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            widget.label,
+                            maxLines: 1,
+                            style: HamsaText.body(
+                              size: 15,
+                              weight: FontWeight.w600,
+                              color: fg,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
                         ),
                       ),
                     ],

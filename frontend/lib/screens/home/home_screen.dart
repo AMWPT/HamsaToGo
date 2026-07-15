@@ -392,7 +392,7 @@ class _HomeHeaderDelegate extends SliverPersistentHeaderDelegate {
                         children: [
                           if (progress < 0.5) ...[
                             Text(
-                              'Good morning,',
+                              'Hello,',
                               style: HamsaText.body(size: 13, color: HamsaColors.muted),
                             ),
                             Text(
