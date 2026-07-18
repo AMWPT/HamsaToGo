@@ -15,7 +15,7 @@ abstract class LegalContent {
 جميع الأسعار المعروضة بالريال السعودي وتشمل ضريبة القيمة المضافة حيث ينطبق ذلك. يحتفظ المقهى بالحق في تعديل الأسعار أو توفر المنتجات في أي وقت دون إشعار مسبق.
 
 4. الدفع الإلكتروني
-جميع الطلبات تُدفع إلكترونياً عبر وسائل الدفع المتاحة في التطبيق (مدى، بطاقات الائتمان، Apple Pay، Samsung Pay). لا يوجد خيار للدفع النقدي عند الاستلام.
+جميع الطلبات تُدفع إلكترونياً عبر وسائل الدفع المتاحة في التطبيق (مدى، بطاقات الائتمان، Apple Pay). لا يوجد خيار للدفع النقدي عند الاستلام.
 
 5. قبول الطلبات
 يحتفظ المقهى بالحق في رفض أو إلغاء أي طلب لأسباب تشمل، على سبيل المثال لا الحصر، نفاد المنتج أو ازدحام غير متوقع، مع إعادة المبلغ المدفوع بالكامل في هذه الحالة.
@@ -51,7 +51,7 @@ Using the app requires registering with a phone number verified via SMS OTP. You
 All prices are listed in Saudi Riyals (SAR) and include VAT where applicable. The cafe reserves the right to change prices or product availability at any time without prior notice.
 
 4. Online Payment
-All orders are paid electronically through the payment methods available in the app (mada, credit cards, Apple Pay, Samsung Pay). Cash on pickup is not available.
+All orders are paid electronically through the payment methods available in the app (mada, credit cards, Apple Pay). Cash on pickup is not available.
 
 5. Order Acceptance
 The cafe reserves the right to decline or cancel any order, including but not limited to cases of stock shortage or unexpected high demand, with a full refund issued in such cases.

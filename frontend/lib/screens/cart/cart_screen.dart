@@ -573,14 +573,9 @@ class _PayCta extends StatelessWidget {
             onPaymentResult: onPaymentResult,
           ),
         );
+      // Samsung Pay is not offered; unreachable, falls through to the
+      // card button just in case.
       case PaymentMethod.samsungPay:
-        return SizedBox(
-          height: 54,
-          child: SamsungPay(
-            config: moyasarConfig,
-            onPaymentResult: onPaymentResult,
-          ),
-        );
       case PaymentMethod.mada:
       case PaymentMethod.card:
         return HamsaButton(
@@ -620,12 +615,11 @@ class _PaymentMethodSelector extends StatelessWidget {
   // "Card" covers both mada and credit cards — Moyasar's card form
   // auto-detects mada from the card number and shows its network icon,
   // so there's no need for a separate mada chip.
-  // Apple Pay is iOS-only, Samsung Pay is Android-only — hide whichever
-  // doesn't apply to the current device instead of showing a dead option.
+  // Apple Pay is iOS-only. Samsung Pay is not offered.
   bool _availableOnPlatform(PaymentMethod m) {
     if (m == PaymentMethod.mada) return false;
     if (m == PaymentMethod.applePay) return Platform.isIOS;
-    if (m == PaymentMethod.samsungPay) return Platform.isAndroid;
+    if (m == PaymentMethod.samsungPay) return false;
     return true;
   }
 

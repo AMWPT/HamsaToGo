@@ -2,7 +2,7 @@ import 'package:moyasar/moyasar.dart';
 import '../core/constants.dart';
 
 /// Builds the Moyasar PaymentConfig shared by all payment widgets
-/// (CreditCard covers both mada and credit cards, plus ApplePay/SamsungPay).
+/// (CreditCard covers both mada and credit cards, plus ApplePay on iOS).
 abstract class MoyasarService {
   static PaymentConfig buildConfig({
     required double amountSar,
@@ -22,11 +22,6 @@ abstract class MoyasarService {
         label: MoyasarConfig.merchantName,
         manual: false,
         saveCard: false,
-      ),
-      samsungPay: SamsungPayConfig(
-        serviceId: MoyasarConfig.samsungPayServiceId,
-        merchantName: MoyasarConfig.merchantName,
-        manual: false,
       ),
     );
   }

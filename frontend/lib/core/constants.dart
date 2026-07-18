@@ -43,9 +43,5 @@ abstract class MoyasarConfig {
   // Apple Developer account and linked in Moyasar's dashboard.
   static const applePayMerchantId = 'merchant.com.hamsa.hamsa_flutter';
 
-  // Samsung Pay service ID comes from the Samsung Pay developer portal,
-  // then gets paired with the Moyasar account.
-  static const samsungPayServiceId = 'REPLACE_ME';
-
   static const merchantName = 'Hamsa Coffee Roasters';
 }
