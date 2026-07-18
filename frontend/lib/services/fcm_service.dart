@@ -60,6 +60,13 @@ class FcmService {
     }
   }
 
+  /// Staff new-order alerts open the admin order screen; customer status
+  /// updates open the customer order screen.
+  static String _orderRoute(RemoteMessage message, String orderId) =>
+      message.data['type'] == 'staff_new_order'
+          ? '/admin/orders/$orderId'
+          : '/orders/$orderId';
+
   static SnackBarAction? _orderAction(
       RemoteMessage message, GlobalKey<NavigatorState> key) {
     final orderId = message.data['order_id'] as String?;
@@ -67,7 +74,8 @@ class FcmService {
     return SnackBarAction(
       label: 'View',
       textColor: const Color(0xFF52B788),
-      onPressed: () => key.currentState?.pushNamed('/orders/$orderId'),
+      onPressed: () =>
+          key.currentState?.pushNamed(_orderRoute(message, orderId)),
     );
   }
 
@@ -75,7 +83,7 @@ class FcmService {
       RemoteMessage message, GlobalKey<NavigatorState> key) {
     final orderId = message.data['order_id'] as String?;
     if (orderId != null) {
-      key.currentState?.pushNamed('/orders/$orderId');
+      key.currentState?.pushNamed(_orderRoute(message, orderId));
     }
   }
 
@@ -90,6 +98,19 @@ class FcmService {
       debugPrint('[FCM] Token registered for $userId');
     } catch (e) {
       debugPrint('[FCM] Token registration failed: $e');
+    }
+  }
+
+  // Call after a staff member logs in (or their session is restored) so
+  // their phone receives new-order alerts.
+  static Future<void> registerStaffToken(ApiService api) async {
+    try {
+      final token = await getToken();
+      if (token == null) return;
+      await api.saveStaffFcmToken(token);
+      debugPrint('[FCM] Staff token registered');
+    } catch (e) {
+      debugPrint('[FCM] Staff token registration failed: $e');
     }
   }
 }

@@ -12,6 +12,10 @@ class TokenUpdate(BaseModel):
     fcm_token: str
 
 
+class StaffTokenUpdate(BaseModel):
+    fcm_token: str
+
+
 class ManualNotification(BaseModel):
     customer_id: str
     title_en: str
@@ -37,6 +41,18 @@ def save_token(payload: TokenUpdate, decoded: dict = Depends(require_user)):
 
     db.update_user(payload.customer_id, {"fcm_token": payload.fcm_token})
     return {"success": True, "message": "FCM token saved."}
+
+
+# ─── Save Staff FCM Token ─────────────────────────────────────
+@router.post("/staff-token")
+def save_staff_token(payload: StaffTokenUpdate,
+                     decoded: dict = Depends(require_staff)):
+    """
+    Save the calling staff member's device token so their phone gets a
+    push notification whenever a new order is placed.
+    """
+    db.set_staff_fcm_token(decoded["uid"], payload.fcm_token)
+    return {"success": True, "message": "Staff FCM token saved."}
 
 
 # ─── Send Manual Notification (Admin) ────────────────────────

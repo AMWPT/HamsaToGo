@@ -116,6 +116,40 @@ def send_push_notification(
         return False
 
 
+def notify_staff_new_order(order: dict) -> int:
+    """
+    Alert every registered staff device that a new order was placed.
+    Staff have no stored language preference, so the text is bilingual.
+    Returns the number of devices notified.
+    """
+    from services.firestore import get_staff_fcm_tokens
+
+    number = order.get("order_number", "")
+    name = order.get("customer_name", "")
+    total = order.get("total_price", 0)
+    count = sum(i.get("quantity", 1) for i in order.get("items", []))
+
+    title = f"🔔 New order #{number} · طلب جديد"
+    body = f"{name} · {count} × items · SAR {total:.2f}"
+
+    sent = 0
+    for token in get_staff_fcm_tokens():
+        ok = send_push_notification(
+            fcm_token=token,
+            title_en=title,
+            title_ar=title,
+            body_en=body,
+            body_ar=body,
+            data={
+                "order_id": order.get("id", ""),
+                "type": "staff_new_order",
+            },
+        )
+        if ok:
+            sent += 1
+    return sent
+
+
 def notify_order_status(customer_id: str, order_id: str, status: str) -> bool:
     """
     Notify a customer that their order moved to a new status, with a

@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from models.order import OrderCreate, OrderStatusUpdate, OrderResponse, OrderStatus
 from services import firestore as db
 from services import postgres as pg
-from services.fcm import notify_order_status
+from services.fcm import notify_order_status, notify_staff_new_order
 from dependencies import require_user, require_staff
 from services.moyasar import verify_payment, refund_payment, PaymentVerificationError, RefundError
 from typing import List, Optional
@@ -84,8 +84,13 @@ def place_order(order: OrderCreate, decoded: dict = Depends(require_user)):
     pg.insert_order(data)
     pg.insert_order_items(data["id"], data.get("items", []))
 
-    # No notification here — the customer just placed the order themselves;
-    # pushes start when staff moves it to in_progress.
+    # No customer notification here — they just placed the order themselves;
+    # their pushes start when staff moves it to in_progress. Staff devices
+    # DO get alerted so new orders aren't missed while the app is closed.
+    try:
+        notify_staff_new_order(data)
+    except Exception as e:
+        print(f"[FCM] Staff new-order alert failed: {e}")
 
     return OrderResponse(**data)
 
