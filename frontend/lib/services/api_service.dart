@@ -255,4 +255,11 @@ class ApiService {
       'fcm_token': token,
     });
   }
+
+  /// Register the signed-in staff member's device for new-order alerts.
+  Future<void> saveStaffFcmToken(String token) async {
+    await _dio.post('/notifications/staff-token', data: {
+      'fcm_token': token,
+    });
+  }
 }

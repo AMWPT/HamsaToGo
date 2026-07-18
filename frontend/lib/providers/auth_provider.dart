@@ -65,6 +65,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
         // just confirm a live Firebase session still backs it.
         if (fbUser != null) {
           state = const AuthState(isAdmin: true);
+          // Re-register the device for new-order alerts (tokens rotate).
+          FcmService.registerStaffToken(_api);
           return;
         }
         await _storage.deleteAll();
@@ -126,6 +128,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (valid) {
         await _storage.write(key: StorageKeys.isAdmin, value: 'true');
         state = const AuthState(isAdmin: true);
+        // Register this device for new-order push alerts.
+        FcmService.registerStaffToken(_api);
         return true;
       } else {
         state = state.copyWith(isLoading: false, error: 'Not authorized');

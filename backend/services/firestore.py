@@ -82,6 +82,23 @@ def is_staff(uid: str) -> bool:
     return db.collection(STAFF).document(uid).get().exists
 
 
+def set_staff_fcm_token(uid: str, token: str) -> None:
+    """Save a staff member's device token for new-order alerts."""
+    db = get_firestore()
+    db.collection(STAFF).document(uid).set({"fcm_token": token}, merge=True)
+
+
+def get_staff_fcm_tokens() -> list:
+    """All registered staff device tokens (deduplicated)."""
+    db = get_firestore()
+    tokens = set()
+    for doc in db.collection(STAFF).stream():
+        t = (doc.to_dict() or {}).get("fcm_token")
+        if t:
+            tokens.add(t)
+    return list(tokens)
+
+
 # ─── Categories ──────────────────────────────────────────────
 def create_category(data: dict) -> dict:
     db = get_firestore()
