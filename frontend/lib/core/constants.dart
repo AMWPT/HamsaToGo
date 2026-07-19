@@ -37,7 +37,7 @@ abstract class AppConstants {
 // never read/refund). The SECRET key must only ever live in the backend .env.
 abstract class MoyasarConfig {
   static const publishableApiKey =
-      'pk_test_icSuNk2NKNPLNxa8YaCf2bBxh6SUBL3BmBuDBUbT';
+      'pk_live_UkuUZMcb2uhzqDnoP48qfrdd68Y7T2EUUxabLvHb';
 
   // Apple Pay only works on iOS once the merchant ID is registered in the
   // Apple Developer account and linked in Moyasar's dashboard.
