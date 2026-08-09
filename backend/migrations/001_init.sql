@@ -33,6 +33,13 @@ CREATE TABLE IF NOT EXISTS orders (
 -- Existing databases created before order_number was added
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS order_number BIGINT;
 
+-- The live tables were provisioned externally (Data Connect) without
+-- timestamp defaults — CREATE TABLE IF NOT EXISTS above never fixes an
+-- existing table, so heal them here (idempotent, runs at every startup).
+ALTER TABLE customers ALTER COLUMN created_at SET DEFAULT NOW();
+ALTER TABLE orders    ALTER COLUMN created_at SET DEFAULT NOW();
+ALTER TABLE orders    ALTER COLUMN updated_at SET DEFAULT NOW();
+
 -- Cash is no longer accepted — drop the legacy 'cash' default so new
 -- orders record the actual online method (or NULL if unknown).
 ALTER TABLE orders ALTER COLUMN payment_method DROP DEFAULT;

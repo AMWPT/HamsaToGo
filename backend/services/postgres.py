@@ -46,22 +46,40 @@ def _parse_db_url(url: str) -> dict:
     }
 
 
+def _connect(url: str):
+    if "/cloudsql/" in url:
+        # Cloud Run → Cloud SQL over the built-in Unix socket.
+        # libpq parses the DSN directly; SSL doesn't apply to a socket.
+        conn = psycopg2.connect(url)
+    else:
+        # TCP (local dev / public IP) — parse and require SSL.
+        params = _parse_db_url(url)
+        conn = psycopg2.connect(**params, sslmode="require")
+    conn.autocommit = True
+    return conn
+
+
 def _get_conn():
     global _conn
     url = os.getenv("DATABASE_URL")
     if not url:
         return None
     try:
-        if _conn is None or _conn.closed:
-            if "/cloudsql/" in url:
-                # Cloud Run → Cloud SQL over the built-in Unix socket.
-                # libpq parses the DSN directly; SSL doesn't apply to a socket.
-                _conn = psycopg2.connect(url)
-            else:
-                # TCP (local dev / public IP) — parse and require SSL.
-                params = _parse_db_url(url)
-                _conn = psycopg2.connect(**params, sslmode="require")
-            _conn.autocommit = True
+        if _conn is not None and not _conn.closed:
+            # Liveness probe — Cloud SQL silently drops idle connections,
+            # and a dead cached connection would make every write fail
+            # (and be swallowed) until the instance restarts.
+            try:
+                with _conn.cursor() as cur:
+                    cur.execute("SELECT 1")
+                return _conn
+            except Exception:
+                try:
+                    _conn.close()
+                except Exception:
+                    pass
+                _conn = None
+        _conn = _connect(url)
         return _conn
     except Exception as e:
         print(f"[Postgres] Connection failed: {e}")
@@ -98,10 +116,13 @@ def upsert_customer(uid: str, phone: str, full_name: str) -> None:
         return
     try:
         with conn.cursor() as cur:
+            # created_at is set explicitly — the live table (provisioned via
+            # Data Connect) has the column NOT NULL without a default, so
+            # omitting it rejects every new customer row.
             cur.execute(
                 """
-                INSERT INTO customers (id, phone, full_name)
-                VALUES (%s, %s, %s)
+                INSERT INTO customers (id, phone, full_name, created_at)
+                VALUES (%s, %s, %s, NOW())
                 ON CONFLICT (id) DO UPDATE
                     SET phone     = EXCLUDED.phone,
                         full_name = EXCLUDED.full_name
