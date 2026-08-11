@@ -136,6 +136,15 @@ def delete_user(user_id: str, decoded: dict = Depends(require_user)):
     db.delete_user(user_id)
     pg.delete_customer(user_id)
 
+    # Remove saved cards and invalidate their Moyasar tokens (best-effort)
+    try:
+        from services.moyasar import delete_token
+        for card in db.delete_customer_cards(user_id):
+            if card.get("token"):
+                delete_token(card["token"])
+    except Exception as e:
+        print(f"[AUTH] Saved-card cleanup failed for {user_id}: {e}")
+
     # Delete the Firebase Auth account (best-effort — may already be gone)
     try:
         firebase_auth.delete_user(user_id)

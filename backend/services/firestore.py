@@ -10,6 +10,7 @@ MENU_ITEMS  = "menu_items"
 ORDERS      = "orders"
 COUNTERS    = "counters"
 STAFF       = "staff"
+SAVED_CARDS = "saved_cards"
 
 
 def now() -> datetime:
@@ -97,6 +98,68 @@ def get_staff_fcm_tokens() -> list:
         if t:
             tokens.add(t)
     return list(tokens)
+
+
+# ─── Saved Cards (Moyasar tokens) ────────────────────────────
+# Only the Moyasar token + display data (brand/last4/expiry) is stored —
+# never the card number. The token is only usable with the secret key.
+
+def save_card(customer_id: str, data: dict) -> dict:
+    """
+    Store a saved card for a customer. If the same physical card was
+    already saved (same last4 + brand + expiry), the existing document is
+    updated with the fresh token instead of creating a duplicate entry.
+    Returns the stored document; data must include 'token'.
+    """
+    db = get_firestore()
+    data["customer_id"] = customer_id
+
+    existing = (
+        db.collection(SAVED_CARDS)
+        .where("customer_id", "==", customer_id)
+        .where("last4", "==", data.get("last4"))
+        .where("brand", "==", data.get("brand"))
+        .get()
+    )
+    for doc in existing:
+        doc.reference.update({**data, "updated_at": now()})
+        return doc_to_dict(doc.reference.get())
+
+    data["created_at"] = now()
+    ref = db.collection(SAVED_CARDS).document()
+    ref.set(data)
+    data["id"] = ref.id
+    return data
+
+
+def get_saved_cards(customer_id: str) -> list:
+    db = get_firestore()
+    query = db.collection(SAVED_CARDS).where("customer_id", "==", customer_id)
+    cards = collection_to_list(query)
+    cards.sort(key=lambda c: str(c.get("created_at", "")), reverse=True)
+    return cards
+
+
+def get_saved_card(card_id: str) -> dict:
+    db = get_firestore()
+    return doc_to_dict(db.collection(SAVED_CARDS).document(card_id).get())
+
+
+def delete_saved_card(card_id: str):
+    db = get_firestore()
+    db.collection(SAVED_CARDS).document(card_id).delete()
+
+
+def delete_customer_cards(customer_id: str) -> list:
+    """Remove all of a customer's saved cards (account deletion).
+    Returns the deleted docs so the caller can invalidate their tokens."""
+    db = get_firestore()
+    docs = db.collection(SAVED_CARDS).where("customer_id", "==", customer_id).get()
+    deleted = []
+    for doc in docs:
+        deleted.append(doc_to_dict(doc))
+        doc.reference.delete()
+    return deleted
 
 
 # ─── Categories ──────────────────────────────────────────────

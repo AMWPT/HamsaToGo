@@ -14,6 +14,7 @@ import os
 import httpx
 
 MOYASAR_API_URL = "https://api.moyasar.com/v1/payments"
+MOYASAR_TOKENS_URL = "https://api.moyasar.com/v1/tokens"
 
 
 class PaymentVerificationError(Exception):
@@ -21,6 +22,10 @@ class PaymentVerificationError(Exception):
 
 
 class RefundError(Exception):
+    pass
+
+
+class TokenChargeError(Exception):
     pass
 
 
@@ -66,6 +71,101 @@ def verify_payment(payment_id: str, expected_amount_sar: float) -> dict:
         )
 
     return payment
+
+
+def charge_token(
+    token: str,
+    amount_halalas: int,
+    description: str,
+    callback_url: str,
+    metadata: dict | None = None,
+) -> dict:
+    """
+    Charges a saved card token. Returns the raw Moyasar payment record.
+
+    The payment usually completes synchronously (status='paid') because the
+    card was 3DS-verified when it was first saved. If the issuer still
+    demands 3DS, the record comes back status='initiated' with a
+    source.transaction_url the customer must visit — the app opens it in a
+    webview and Moyasar redirects to callback_url when done.
+    """
+    secret_key = os.getenv("MOYASAR_SECRET_KEY")
+    if not secret_key:
+        raise TokenChargeError(
+            "MOYASAR_SECRET_KEY not set — cannot charge saved cards."
+        )
+
+    try:
+        resp = httpx.post(
+            MOYASAR_API_URL,
+            auth=(secret_key, ""),
+            json={
+                "amount": amount_halalas,
+                "currency": "SAR",
+                "description": description,
+                "callback_url": callback_url,
+                "metadata": metadata or {},
+                "source": {"type": "token", "token": token},
+            },
+            timeout=15.0,
+        )
+    except httpx.HTTPError as e:
+        raise TokenChargeError(f"Could not reach Moyasar: {e}")
+
+    if resp.status_code not in (200, 201):
+        raise TokenChargeError(
+            f"Moyasar returned {resp.status_code} charging token: {resp.text}"
+        )
+
+    payment = resp.json()
+    if payment.get("status") == "failed":
+        message = (payment.get("source") or {}).get("message", "declined")
+        raise TokenChargeError(f"Charge failed: {message}")
+
+    return payment
+
+
+def get_token(token_id: str) -> dict | None:
+    """Fetches a saved-card token's details (brand, last4, expiry). Returns
+    None on any failure — callers use this only to enrich display data."""
+    secret_key = os.getenv("MOYASAR_SECRET_KEY")
+    if not secret_key:
+        return None
+    try:
+        resp = httpx.get(
+            f"{MOYASAR_TOKENS_URL}/{token_id}",
+            auth=(secret_key, ""),
+            timeout=10.0,
+        )
+        if resp.status_code == 200:
+            return resp.json()
+    except httpx.HTTPError:
+        pass
+    return None
+
+
+def delete_token(token_id: str) -> bool:
+    """
+    Invalidates a saved-card token on Moyasar's side. Returns True when the
+    token is gone (deleted now, or already didn't exist). Failures are
+    logged, not raised — the caller removes the local record regardless,
+    since a token is unusable without the secret key anyway.
+    """
+    secret_key = os.getenv("MOYASAR_SECRET_KEY")
+    if not secret_key:
+        return False
+    try:
+        resp = httpx.delete(
+            f"{MOYASAR_TOKENS_URL}/{token_id}",
+            auth=(secret_key, ""),
+            timeout=10.0,
+        )
+        if resp.status_code in (200, 204, 404):
+            return True
+        print(f"[Moyasar] delete_token {token_id} returned {resp.status_code}: {resp.text}")
+    except httpx.HTTPError as e:
+        print(f"[Moyasar] delete_token {token_id} failed: {e}")
+    return False
 
 
 def refund_payment(payment_id: str) -> dict:
