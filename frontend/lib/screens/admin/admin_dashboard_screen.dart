@@ -88,6 +88,12 @@ class _AdminDashboardScreenState
                         ),
                         const SizedBox(width: 8),
                         _NavIcon(
+                          icon: Icons.assessment_outlined,
+                          label: 'Reports',
+                          onTap: () => context.push(AppRoutes.reports),
+                        ),
+                        const SizedBox(width: 8),
+                        _NavIcon(
                           icon: Icons.logout_rounded,
                           label: 'Logout',
                           onTap: () => ref

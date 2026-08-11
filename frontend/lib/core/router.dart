@@ -16,6 +16,7 @@ import '../screens/admin/admin_dashboard_screen.dart';
 import '../screens/admin/admin_order_detail_screen.dart';
 import '../screens/admin/menu_manager_screen.dart';
 import '../screens/admin/history_screen.dart';
+import '../screens/admin/reports_screen.dart';
 import '../screens/legal/legal_screen.dart';
 
 abstract class AppRoutes {
@@ -33,6 +34,7 @@ abstract class AppRoutes {
   static const adminOrderDetail = '/admin/orders/:id';
   static const menuManager = '/admin/menu';
   static const history = '/admin/history';
+  static const reports = '/admin/reports';
   static const legal = '/legal';
 }
 
@@ -148,6 +150,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: AppRoutes.history,
         builder: (_, __) => const HistoryScreen(),
+      ),
+      GoRoute(
+        path: AppRoutes.reports,
+        builder: (_, __) => const ReportsScreen(),
       ),
       GoRoute(
         path: AppRoutes.legal,

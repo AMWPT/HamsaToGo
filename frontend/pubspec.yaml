@@ -1,7 +1,7 @@
 name: hamsa_flutter
 description: Hamsa To Go — Coffee Ordering App
 publish_to: 'none'
-version: 1.0.0+3
+version: 1.0.1+4
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -34,6 +34,10 @@ dependencies:
 
   # Payments
   moyasar: ^3.0.3
+
+  # PDF reports (staff daily report export)
+  pdf: ^3.11.1
+  printing: ^5.13.4
 
   # Storage
   shared_preferences: ^2.3.0

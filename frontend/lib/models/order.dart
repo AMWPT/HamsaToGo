@@ -218,6 +218,7 @@ class Order {
   final String id;
   final int orderNumber; // sequential, 1-based; 0 = legacy order without one
   final String customerId;
+  final String customerName;
   final List<OrderItemModel> items;
   final double totalPrice;
   final OrderStatus status;
@@ -230,6 +231,7 @@ class Order {
     required this.id,
     this.orderNumber = 0,
     required this.customerId,
+    this.customerName = '',
     required this.items,
     required this.totalPrice,
     required this.status,
@@ -249,6 +251,7 @@ class Order {
         id: json['id'] as String,
         orderNumber: (json['order_number'] as num?)?.toInt() ?? 0,
         customerId: json['customer_id'] as String,
+        customerName: json['customer_name'] as String? ?? '',
         items: (json['items'] as List<dynamic>)
             .map((i) => OrderItemModel.fromJson(i as Map<String, dynamic>))
             .toList(),
@@ -274,6 +277,7 @@ class Order {
       id: doc.id,
       orderNumber: (json['order_number'] as num?)?.toInt() ?? 0,
       customerId: json['customer_id'] as String,
+      customerName: json['customer_name'] as String? ?? '',
       items: (json['items'] as List<dynamic>)
           .map((i) => OrderItemModel.fromJson(i as Map<String, dynamic>))
           .toList(),
