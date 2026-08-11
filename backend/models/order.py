@@ -48,6 +48,7 @@ class OrderCreate(BaseModel):
     items: List[OrderItemCreate]
     payment_method: PaymentMethod        # required — orders are paid online
     payment_id: str                      # Moyasar payment ID, verified server-side before order creation
+    save_card: bool = False              # customer opted to save the card — token taken from the verified payment
     notes: str = ""
 
 

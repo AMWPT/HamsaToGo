@@ -4,6 +4,7 @@ import '../core/constants.dart';
 import '../models/user.dart';
 import '../models/menu_item.dart';
 import '../models/order.dart';
+import '../models/saved_card.dart';
 
 class ApiService {
   late final Dio _dio;
@@ -189,6 +190,7 @@ class ApiService {
     required List<CartItem> items,
     required PaymentMethod paymentMethod,
     required String paymentId,
+    bool saveCard = false,
     String? notes,
   }) async {
     final res = await _dio.post('/orders/', data: {
@@ -197,9 +199,37 @@ class ApiService {
       'items': items.map((i) => i.toOrderItem().toJson()).toList(),
       'payment_method': paymentMethod.toApiString(),
       'payment_id': paymentId,
+      'save_card': saveCard,
       if (notes != null) 'notes': notes,
     });
     return Order.fromJson(res.data as Map<String, dynamic>);
+  }
+
+  // ─── Saved Cards ───────────────────────────────────────────
+
+  Future<List<SavedCard>> getSavedCards() async {
+    final res = await _dio.get('/cards/');
+    return (res.data as List<dynamic>)
+        .map((c) => SavedCard.fromJson(c as Map<String, dynamic>))
+        .toList();
+  }
+
+  Future<void> deleteSavedCard(String cardId) async {
+    await _dio.delete('/cards/$cardId');
+  }
+
+  /// Charge a saved card for the current cart. The backend recomputes the
+  /// total from the menu; on success (or after the 3DS webview when
+  /// [TokenChargeResult.needs3ds]) follow up with [placeOrder] using the
+  /// returned payment id.
+  Future<TokenChargeResult> payWithSavedCard({
+    required String cardId,
+    required List<CartItem> items,
+  }) async {
+    final res = await _dio.post('/cards/$cardId/pay', data: {
+      'items': items.map((i) => i.toOrderItem().toJson()).toList(),
+    });
+    return TokenChargeResult.fromJson(res.data as Map<String, dynamic>);
   }
 
   Future<List<Order>> getActiveOrders() async {

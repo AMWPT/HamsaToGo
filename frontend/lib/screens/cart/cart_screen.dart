@@ -1,5 +1,6 @@
 import 'dart:io' show Platform;
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -10,9 +11,12 @@ import '../../core/router.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/cart_provider.dart';
 import '../../providers/locale_provider.dart';
+import '../../providers/saved_cards_provider.dart';
 import '../../models/order.dart';
+import '../../models/saved_card.dart';
 import '../../services/moyasar_service.dart';
 import '../../widgets/hamsa_button.dart';
+import '../../widgets/token_three_ds_webview.dart';
 
 class CartScreen extends ConsumerStatefulWidget {
   const CartScreen({super.key});
@@ -25,6 +29,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   bool _isPlacing = false;
   PaymentMethod _method = PaymentMethod.card;
 
+  // Whether the customer opted to save the card they're typing in the
+  // new-card sheet. Read by _completeOrder so the backend stores the token.
+  bool _saveNewCard = false;
+
   bool get _isAr => ref.read(localeProvider).languageCode == 'ar';
 
   // ── Step 1: user taps "Pay & Place Order" — start the Moyasar flow ────
@@ -33,12 +41,28 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final auth = ref.read(authProvider);
     if (cart.isEmpty || auth.user == null) return;
 
+    // Returning customers with saved cards pick one (or a new card) first;
+    // everyone else goes straight to the card form. A failed fetch just
+    // falls back to the normal form — never block checkout on it.
+    List<SavedCard> saved = const [];
+    try {
+      saved = await ref.read(savedCardsProvider.future);
+    } catch (_) {}
+    if (!mounted) return;
+
+    if (saved.isEmpty) {
+      await _showNewCardSheet();
+    } else {
+      await _showSavedCardsSheet(saved);
+    }
+  }
+
+  // ── New-card sheet (Moyasar card form) ────────────────────────────────
+  Future<void> _showNewCardSheet() async {
+    final auth = ref.read(authProvider);
     final total = ref.read(cartTotalProvider);
-    final config = MoyasarService.buildConfig(
-      amountSar: total,
-      description: 'Hamsa To Go order — ${auth.user!.fullName}',
-      metadata: {'customer_id': auth.user!.id},
-    );
+    if (auth.user == null) return;
+    _saveNewCard = false;
 
     // Apple Pay / Samsung Pay show their own native button widget instead —
     // this path is only reached for mada/card, which uses the card form sheet.
@@ -52,90 +76,348 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (sheetCtx) => Padding(
-        padding: EdgeInsets.only(bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
-        child: SafeArea(
-          top: false,
-          child: SingleChildScrollView(
-            child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Header — explicit back arrow instead of swipe-to-dismiss,
-              // so an accidental swipe mid-typing doesn't lose card details.
-              Padding(
-                padding: const EdgeInsets.fromLTRB(8, 12, 20, 4),
-                child: Row(
-                  textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setSheetState) {
+          // Rebuilt when the save-card toggle changes — the SDK reads
+          // saveCard only when the CreditCard widget is created, so the
+          // form is keyed by the toggle (toggling resets typed fields,
+          // which is why the toggle sits above the form).
+          final config = MoyasarService.buildConfig(
+            amountSar: total,
+            description: 'Hamsa To Go order — ${auth.user!.fullName}',
+            metadata: {'customer_id': auth.user!.id},
+            saveCard: _saveNewCard,
+          );
+          return Padding(
+            padding:
+                EdgeInsets.only(bottom: MediaQuery.of(sheetCtx).viewInsets.bottom),
+            child: SafeArea(
+              top: false,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    IconButton(
-                      icon: Icon(
-                        isAr
-                            ? Icons.arrow_forward_ios_rounded
-                            : Icons.arrow_back_ios_new_rounded,
-                        color: HamsaColors.cream,
-                        size: 18,
-                      ),
-                      onPressed: () => Navigator.of(sheetCtx).pop(),
-                    ),
-                    Expanded(
-                      child: Column(
-                        // The app is RTL-wide in Arabic, so `start` already
-                        // resolves to the right edge — flipping to `end`
-                        // here would double-flip back to the left.
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    // Header — explicit back arrow instead of swipe-to-dismiss,
+                    // so an accidental swipe mid-typing doesn't lose card details.
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(8, 12, 20, 4),
+                      child: Row(
+                        textDirection:
+                            isAr ? TextDirection.rtl : TextDirection.ltr,
                         children: [
-                          Text(
-                            isAr ? 'الدفع بالبطاقة' : 'Card Payment',
-                            style: HamsaText.heading(size: 17, color: HamsaColors.cream),
+                          IconButton(
+                            icon: Icon(
+                              isAr
+                                  ? Icons.arrow_forward_ios_rounded
+                                  : Icons.arrow_back_ios_new_rounded,
+                              color: HamsaColors.cream,
+                              size: 18,
+                            ),
+                            onPressed: () => Navigator.of(sheetCtx).pop(),
                           ),
-                          const SizedBox(height: 2),
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
-                            children: [
-                              const Icon(Icons.lock_rounded,
-                                  size: 12, color: HamsaColors.greenAccent),
-                              const SizedBox(width: 4),
-                              Text(
-                                isAr ? 'دفع آمن ومشفّر' : 'Secure encrypted payment',
-                                style: HamsaText.body(size: 11, color: HamsaColors.muted),
-                              ),
-                            ],
+                          Expanded(
+                            child: Column(
+                              // The app is RTL-wide in Arabic, so `start` already
+                              // resolves to the right edge — flipping to `end`
+                              // here would double-flip back to the left.
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isAr ? 'الدفع بالبطاقة' : 'Card Payment',
+                                  style: HamsaText.heading(
+                                      size: 17, color: HamsaColors.cream),
+                                ),
+                                const SizedBox(height: 2),
+                                Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  textDirection: isAr
+                                      ? TextDirection.rtl
+                                      : TextDirection.ltr,
+                                  children: [
+                                    const Icon(Icons.lock_rounded,
+                                        size: 12,
+                                        color: HamsaColors.greenAccent),
+                                    const SizedBox(width: 4),
+                                    Text(
+                                      isAr
+                                          ? 'دفع آمن ومشفّر'
+                                          : 'Secure encrypted payment',
+                                      style: HamsaText.body(
+                                          size: 11, color: HamsaColors.muted),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
                           ),
                         ],
+                      ),
+                    ),
+
+                    // Save-card consent — sits above the form because
+                    // toggling it recreates the card form below.
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => setSheetState(
+                            () => _saveNewCard = !_saveNewCard),
+                        child: Row(
+                          textDirection:
+                              isAr ? TextDirection.rtl : TextDirection.ltr,
+                          children: [
+                            Icon(
+                              _saveNewCard
+                                  ? Icons.check_box_rounded
+                                  : Icons.check_box_outline_blank_rounded,
+                              size: 20,
+                              color: _saveNewCard
+                                  ? HamsaColors.greenAccent
+                                  : HamsaColors.muted,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                isAr
+                                    ? 'احفظ بطاقتي للدفع الأسرع في المرات القادمة'
+                                    : 'Save my card for faster checkout next time',
+                                style: HamsaText.body(
+                                    size: 12, color: HamsaColors.creamMuted),
+                                textAlign:
+                                    isAr ? TextAlign.right : TextAlign.left,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                    // Card form — Moyasar renders its own white input fields, so
+                    // we frame it in a rounded elevated surface instead of leaving
+                    // it floating directly on the dark sheet background.
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: HamsaColors.bgCard,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(color: HamsaColors.border),
+                        ),
+                        child: CreditCard(
+                          key: ValueKey(_saveNewCard),
+                          config: config,
+                          onPaymentResult: (result) {
+                            Navigator.of(sheetCtx).pop();
+                            _handlePaymentResult(result);
+                          },
+                        ),
                       ),
                     ),
                   ],
                 ),
               ),
+            ),
+          );
+        },
+      ),
+    );
+  }
 
-              // Card form — Moyasar renders its own white input fields, so
-              // we frame it in a rounded elevated surface instead of leaving
-              // it floating directly on the dark sheet background.
+  // ── Saved-cards sheet — pick a card, remove one, or use a new card ────
+  Future<void> _showSavedCardsSheet(List<SavedCard> cards) async {
+    final isAr = _isAr;
+    final local = [...cards];
+
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: HamsaColors.bgSurface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetCtx) => StatefulBuilder(
+        builder: (sheetCtx, setSheetState) => SafeArea(
+          top: false,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
               Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: HamsaColors.bgCard,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: HamsaColors.border),
+                padding: const EdgeInsets.fromLTRB(24, 20, 24, 8),
+                child: Align(
+                  alignment:
+                      isAr ? Alignment.centerRight : Alignment.centerLeft,
+                  child: Text(
+                    isAr ? 'الدفع باستخدام' : 'Pay with',
+                    style:
+                        HamsaText.heading(size: 17, color: HamsaColors.cream),
                   ),
-                  child: CreditCard(
-                    config: config,
-                    onPaymentResult: (result) {
-                      Navigator.of(sheetCtx).pop();
-                      _handlePaymentResult(result);
-                    },
+                ),
+              ),
+              for (final card in local)
+                _SavedCardTile(
+                  card: card,
+                  isAr: isAr,
+                  onTap: () {
+                    Navigator.of(sheetCtx).pop();
+                    _payWithSavedCard(card);
+                  },
+                  onDelete: () async {
+                    final removed = await _confirmDeleteCard(card);
+                    if (removed) {
+                      setSheetState(() => local.remove(card));
+                      // Last card gone — fall back to the plain card form.
+                      if (local.isEmpty && sheetCtx.mounted) {
+                        Navigator.of(sheetCtx).pop();
+                      }
+                    }
+                  },
+                ),
+              // "New card" escape hatch below the saved cards
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 4, 20, 20),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.of(sheetCtx).pop();
+                    _showNewCardSheet();
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: HamsaColors.bgElevated,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: HamsaColors.border),
+                    ),
+                    child: Row(
+                      textDirection:
+                          isAr ? TextDirection.rtl : TextDirection.ltr,
+                      children: [
+                        const Icon(Icons.add_card_rounded,
+                            size: 20, color: HamsaColors.greenAccent),
+                        const SizedBox(width: 12),
+                        Text(
+                          isAr ? 'استخدام بطاقة جديدة' : 'Use a new card',
+                          style: HamsaText.body(
+                            size: 14,
+                            weight: FontWeight.w600,
+                            color: HamsaColors.cream,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ),
             ],
-            ),
           ),
         ),
       ),
     );
+  }
+
+  /// Confirmation + deletion of a saved card. Returns true when deleted.
+  Future<bool> _confirmDeleteCard(SavedCard card) async {
+    final isAr = _isAr;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: HamsaColors.bgCard,
+        title: Text(
+          isAr ? 'حذف البطاقة؟' : 'Remove card?',
+          style: HamsaText.heading(size: 16, color: HamsaColors.cream),
+        ),
+        content: Text(
+          card.displayName,
+          style: HamsaText.body(size: 14, color: HamsaColors.creamMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(false),
+            child: Text(isAr ? 'إلغاء' : 'Cancel',
+                style: HamsaText.body(size: 13, color: HamsaColors.muted)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(true),
+            child: Text(isAr ? 'حذف' : 'Remove',
+                style: HamsaText.body(size: 13, color: HamsaColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return false;
+
+    try {
+      await ref.read(apiServiceProvider).deleteSavedCard(card.id);
+      ref.invalidate(savedCardsProvider);
+      return true;
+    } catch (_) {
+      if (mounted) {
+        _showError(isAr
+            ? 'تعذّر حذف البطاقة. حاول مرة أخرى.'
+            : 'Could not remove the card. Please try again.');
+      }
+      return false;
+    }
+  }
+
+  // ── Pay with a saved card (token charge on the backend) ───────────────
+  Future<void> _payWithSavedCard(SavedCard card) async {
+    final cart = ref.read(cartProvider);
+    if (cart.isEmpty) return;
+    _saveNewCard = false; // token is already saved — nothing new to store
+
+    setState(() => _isPlacing = true);
+    try {
+      final api = ref.read(apiServiceProvider);
+      final charge = await api.payWithSavedCard(cardId: card.id, items: cart);
+      if (!mounted) return;
+
+      if (charge.isPaid) {
+        await _completeOrder(charge.paymentId);
+      } else if (charge.needs3ds) {
+        // Issuer wants a 3DS challenge — rare for token charges, but the
+        // flow must survive it. The webview pops itself, then reports.
+        setState(() => _isPlacing = false);
+        await Navigator.of(context).push(MaterialPageRoute(
+          fullscreenDialog: true,
+          maintainState: false,
+          builder: (_) => TokenThreeDsWebView(
+            transactionUrl: charge.transactionUrl!,
+            isAr: _isAr,
+            onDone: (status, message) {
+              if (status == 'paid') {
+                _completeOrder(charge.paymentId);
+              } else if (status != 'cancelled') {
+                _showError(_isAr
+                    ? 'تعذّر إتمام الدفع. حاول مرة أخرى.'
+                    : 'Payment could not be completed. Please try again.');
+              }
+            },
+          ),
+        ));
+      } else {
+        _showError(_isAr
+            ? 'تعذّر إتمام الدفع. حاول مرة أخرى.'
+            : 'Payment could not be completed. Please try again.');
+      }
+    } on DioException catch (e) {
+      if (!mounted) return;
+      // 402 = declined / expired token; anything else is a plumbing issue.
+      final declined = e.response?.statusCode == 402;
+      _showError(declined
+          ? (_isAr
+              ? 'رفضت البطاقة المحفوظة. جرّب بطاقة أخرى.'
+              : 'Your saved card was declined. Try another card.')
+          : (_isAr
+              ? 'تعذّر إتمام الدفع. حاول مرة أخرى.'
+              : 'Payment could not be completed. Please try again.'));
+    } catch (_) {
+      if (!mounted) return;
+      _showError(_isAr
+          ? 'تعذّر إتمام الدفع. حاول مرة أخرى.'
+          : 'Payment could not be completed. Please try again.');
+    } finally {
+      if (mounted && _isPlacing) setState(() => _isPlacing = false);
+    }
   }
 
   // ── Step 2: Apple Pay / Samsung Pay widgets call this directly ────────
@@ -177,8 +459,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         items: cart,
         paymentMethod: _method,
         paymentId: paymentId,
+        // The backend extracts the card token from the verified payment
+        // (no-op for Apple Pay or when the customer didn't opt in).
+        saveCard: _saveNewCard,
       );
       ref.read(cartProvider.notifier).clear();
+      if (_saveNewCard) ref.invalidate(savedCardsProvider);
       if (!mounted) return;
       context.pushReplacement('/orders/${order.id}');
     } catch (e) {
@@ -277,6 +563,76 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 ),
               ],
             ),
+    );
+  }
+}
+
+// ─── Saved Card Tile ──────────────────────────────────────────
+class _SavedCardTile extends StatelessWidget {
+  final SavedCard card;
+  final bool isAr;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  const _SavedCardTile({
+    required this.card,
+    required this.isAr,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          decoration: BoxDecoration(
+            color: HamsaColors.bgCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: HamsaColors.border),
+          ),
+          child: Row(
+            textDirection: isAr ? TextDirection.rtl : TextDirection.ltr,
+            children: [
+              const Icon(Icons.credit_card_rounded,
+                  size: 22, color: HamsaColors.greenAccent),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment:
+                      isAr ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      card.displayName,
+                      style: HamsaText.body(
+                        size: 14,
+                        weight: FontWeight.w600,
+                        color: HamsaColors.cream,
+                      ),
+                    ),
+                    if (card.expiryLabel.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        card.expiryLabel,
+                        style:
+                            HamsaText.body(size: 11, color: HamsaColors.muted),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              IconButton(
+                icon: const Icon(Icons.delete_outline_rounded,
+                    size: 20, color: HamsaColors.muted),
+                onPressed: onDelete,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

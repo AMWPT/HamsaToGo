@@ -4,10 +4,50 @@ from services import firestore as db
 from services import postgres as pg
 from services.fcm import notify_order_status, notify_staff_new_order
 from dependencies import require_user, require_staff
-from services.moyasar import verify_payment, refund_payment, PaymentVerificationError, RefundError
+from services.moyasar import (
+    verify_payment, refund_payment, get_token,
+    PaymentVerificationError, RefundError,
+)
 from typing import List, Optional
 
 router = APIRouter(prefix="/orders", tags=["Orders"])
+
+
+def _save_card_from_payment(uid: str, payment: dict) -> None:
+    """
+    Persist the Moyasar card token from a verified payment as the
+    customer's saved card. No-op when the payment carries no token (Apple
+    Pay, or the SDK didn't tokenize). Expiry comes from the token record;
+    brand/last4 fall back to the payment's card source.
+    """
+    source = payment.get("source") or {}
+    token = source.get("token")
+    if not token:
+        return
+
+    # source.number is masked, e.g. "XXXX-XXXX-XXXX-1115"
+    masked = source.get("number", "") or ""
+    last4 = "".join(ch for ch in masked if ch.isdigit())[-4:]
+    brand = (source.get("company") or "").lower()
+
+    expiry_month = expiry_year = None
+    token_info = get_token(token)
+    if token_info:
+        try:
+            expiry_month = int(token_info.get("month"))
+            expiry_year = int(token_info.get("year"))
+        except (TypeError, ValueError):
+            pass
+        brand = (token_info.get("brand") or brand or "").lower()
+        last4 = token_info.get("last_four") or last4
+
+    db.save_card(uid, {
+        "token": token,
+        "brand": brand,
+        "last4": last4,
+        "expiry_month": expiry_month,
+        "expiry_year": expiry_year,
+    })
 
 
 def _authoritative_unit_price(menu_item: dict, customizations: dict) -> float:
@@ -34,6 +74,29 @@ def _authoritative_unit_price(menu_item: dict, customizations: dict) -> float:
     return price
 
 
+def price_order_items(items) -> float:
+    """
+    Validate cart items against the menu (exist + available) and stamp each
+    with its authoritative unit price. Mutates the items in place and
+    returns the order total. Shared by order placement and by saved-card
+    charging so both always price identically.
+    """
+    for item in items:
+        menu_item = db.get_menu_item(item.menu_item_id)
+        if not menu_item:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Menu item '{item.name_en}' not found."
+            )
+        if not menu_item.get("available", False):
+            raise HTTPException(
+                status_code=400,
+                detail=f"'{item.name_en}' is currently unavailable."
+            )
+        item.price = _authoritative_unit_price(menu_item, item.customizations)
+    return sum(item.price * item.quantity for item in items)
+
+
 # ─── Place Order (Customer) ───────────────────────────────────
 @router.post("/", response_model=OrderResponse, status_code=201)
 def place_order(order: OrderCreate, decoded: dict = Depends(require_user)):
@@ -53,30 +116,27 @@ def place_order(order: OrderCreate, decoded: dict = Depends(require_user)):
     order.customer_name = customer.get("full_name", "") or order.customer_name
 
     # Verify items exist + are available, and set the authoritative price.
-    for item in order.items:
-        menu_item = db.get_menu_item(item.menu_item_id)
-        if not menu_item:
-            raise HTTPException(
-                status_code=404,
-                detail=f"Menu item '{item.name_en}' not found."
-            )
-        if not menu_item.get("available", False):
-            raise HTTPException(
-                status_code=400,
-                detail=f"'{item.name_en}' is currently unavailable."
-            )
-        item.price = _authoritative_unit_price(menu_item, item.customizations)
+    expected_total = price_order_items(order.items)
 
     # Verify the payment actually went through before creating the order —
     # never trust the client's claim alone.
-    expected_total = sum(item.price * item.quantity for item in order.items)
     try:
-        verify_payment(order.payment_id, expected_total)
+        payment = verify_payment(order.payment_id, expected_total)
     except PaymentVerificationError as e:
         raise HTTPException(status_code=402, detail=f"Payment verification failed: {e}")
 
-    # Create the order in Firestore (store the method as a plain string)
-    payload = order.model_dump()
+    # Customer opted to save their card: the verified payment record carries
+    # the Moyasar token (present only when the SDK tokenized the card).
+    # Failures here must never lose a paid order, so they only log.
+    if order.save_card:
+        try:
+            _save_card_from_payment(uid, payment)
+        except Exception as e:
+            print(f"[Cards] Saving card after payment {order.payment_id} failed: {e}")
+
+    # Create the order in Firestore (store the method as a plain string;
+    # save_card is a payment-flow flag, not order data)
+    payload = order.model_dump(exclude={"save_card"})
     payload["payment_method"] = order.payment_method.value
     data = db.create_order(payload)
 

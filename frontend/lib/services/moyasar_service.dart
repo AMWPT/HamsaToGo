@@ -8,6 +8,9 @@ abstract class MoyasarService {
     required double amountSar,
     required String description,
     Map<String, String> metadata = const {},
+    // When true the card is tokenized with the payment; the backend then
+    // stores the token if the order is placed with save_card = true.
+    bool saveCard = false,
   }) {
     final halalas = (amountSar * 100).round();
 
@@ -16,7 +19,7 @@ abstract class MoyasarService {
       amount: halalas,
       description: description,
       metadata: metadata,
-      creditCard: CreditCardConfig(saveCard: false, manual: false),
+      creditCard: CreditCardConfig(saveCard: saveCard, manual: false),
       applePay: ApplePayConfig(
         merchantId: MoyasarConfig.applePayMerchantId,
         label: MoyasarConfig.merchantName,
