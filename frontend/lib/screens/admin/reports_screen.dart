@@ -2,7 +2,6 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -120,14 +119,17 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   }
 
   Future<Uint8List> _buildPdf() async {
-    // Noor renders Arabic + Latin + digits, so use it everywhere in the PDF.
-    final fontData = await rootBundle.load('assets/fonts/NoorRegular.ttf');
-    final noor = pw.Font.ttf(fontData);
+    // Noto Sans Arabic renders Arabic (with proper shaping), Latin letters,
+    // and digits — unlike the Noor display font, which only has Arabic glyphs
+    // and rendered everything else as tofu/symbols. Loaded via the printing
+    // package's font helper (downloaded + cached on first use).
+    final base = await PdfGoogleFonts.notoSansArabicRegular();
+    final bold = await PdfGoogleFonts.notoSansArabicBold();
     final isAr = ref.read(localeProvider).languageCode == 'ar';
     final dateStr = DateFormat('EEEE, d MMMM yyyy').format(_date);
 
     final doc = pw.Document();
-    final theme = pw.ThemeData.withFont(base: noor, bold: noor);
+    final theme = pw.ThemeData.withFont(base: base, bold: bold);
 
     doc.addPage(
       pw.MultiPage(

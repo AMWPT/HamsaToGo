@@ -200,17 +200,35 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: HamsaColors.bgCard,
+                          // Light surface so Moyasar's form (white input boxes,
+                          // black labels) is fully legible. Its input text has
+                          // no explicit color, so on the app's dark theme it
+                          // inherited a near-invisible light green — the light
+                          // theme wrapper below forces it to black.
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(color: HamsaColors.border),
                         ),
-                        child: CreditCard(
-                          key: ValueKey(_saveNewCard),
-                          config: config,
-                          onPaymentResult: (result) {
-                            Navigator.of(sheetCtx).pop();
-                            _handlePaymentResult(result);
-                          },
+                        child: Theme(
+                          data: ThemeData(
+                            brightness: Brightness.light,
+                            colorScheme: const ColorScheme.light(
+                              primary: HamsaColors.greenBrand,
+                              onSurface: Colors.black,
+                            ),
+                            textTheme: ThemeData.light().textTheme.apply(
+                                  bodyColor: Colors.black,
+                                  displayColor: Colors.black,
+                                ),
+                          ),
+                          child: CreditCard(
+                            key: ValueKey(_saveNewCard),
+                            config: config,
+                            onPaymentResult: (result) {
+                              Navigator.of(sheetCtx).pop();
+                              _handlePaymentResult(result);
+                            },
+                          ),
                         ),
                       ),
                     ),
