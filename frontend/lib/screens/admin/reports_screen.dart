@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -119,17 +120,18 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   }
 
   Future<Uint8List> _buildPdf() async {
-    // Noto Sans Arabic renders Arabic (with proper shaping), Latin letters,
-    // and digits — unlike the Noor display font, which only has Arabic glyphs
-    // and rendered everything else as tofu/symbols. Loaded via the printing
-    // package's font helper (downloaded + cached on first use).
-    final base = await PdfGoogleFonts.notoSansArabicRegular();
-    final bold = await PdfGoogleFonts.notoSansArabicBold();
+    // Noto Sans Arabic covers Arabic (with proper shaping), Latin letters and
+    // digits in one font. Bundled as an app asset so it always loads — no
+    // network needed — unlike the Noor display font, which only had Arabic
+    // glyphs and rendered Latin/numbers as symbols.
+    final fontData =
+        await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf');
+    final noto = pw.Font.ttf(fontData);
     final isAr = ref.read(localeProvider).languageCode == 'ar';
     final dateStr = DateFormat('EEEE, d MMMM yyyy').format(_date);
 
     final doc = pw.Document();
-    final theme = pw.ThemeData.withFont(base: base, bold: bold);
+    final theme = pw.ThemeData.withFont(base: noto, bold: noto);
 
     doc.addPage(
       pw.MultiPage(
@@ -139,8 +141,8 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
         margin: const pw.EdgeInsets.all(28),
         build: (ctx) => [
           // Header
-          pw.Text(isAr ? 'حمصة لتحميص القهوة' : 'Hamsa Coffee Roasters',
-              style: pw.TextStyle(fontSize: 20, color: PdfColors.green900)),
+          pw.Text(isAr ? 'حمصة' : 'Hamsa',
+              style: pw.TextStyle(fontSize: 22, color: PdfColors.green900)),
           pw.Text(isAr ? 'تقرير المبيعات اليومي' : 'Daily Sales Report',
               style: const pw.TextStyle(fontSize: 13, color: PdfColors.grey700)),
           pw.SizedBox(height: 4),
