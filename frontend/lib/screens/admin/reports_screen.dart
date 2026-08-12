@@ -120,10 +120,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   }
 
   Future<Uint8List> _buildPdf() async {
-    // Noto Sans Arabic covers Arabic (with proper shaping), Latin letters and
-    // digits in one font. Bundled as an app asset so it always loads — no
-    // network needed — unlike the Noor display font, which only had Arabic
-    // glyphs and rendered Latin/numbers as symbols.
+    // Noto Sans Arabic covers Arabic (with proper shaping) but this build has
+    // no Latin/digit glyphs, so English + numbers rendered as tofu when it was
+    // the base font. Fix: use the PDF's built-in Helvetica for Latin + digits
+    // and fall back to Noto only for the Arabic characters it does cover.
     final fontData =
         await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf');
     final noto = pw.Font.ttf(fontData);
@@ -131,7 +131,11 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     final dateStr = DateFormat('EEEE, d MMMM yyyy').format(_date);
 
     final doc = pw.Document();
-    final theme = pw.ThemeData.withFont(base: noto, bold: noto);
+    final theme = pw.ThemeData.withFont(
+      base: pw.Font.helvetica(),
+      bold: pw.Font.helveticaBold(),
+      fontFallback: [noto],
+    );
 
     doc.addPage(
       pw.MultiPage(
