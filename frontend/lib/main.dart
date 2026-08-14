@@ -1,6 +1,7 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
+import 'package:flutter/foundation.dart' show kDebugMode, PlatformDispatcher;
 import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'package:flutter/services.dart';
@@ -30,6 +31,19 @@ void main() async {
           : AppleProvider.appAttest,
     );
     await FcmService.initialize(navigatorKey: navigatorKey);
+
+    // Crash reporting — only collect in release builds so local debugging
+    // isn't polluted. Route both Flutter framework errors and uncaught async
+    // errors to Crashlytics so we actually learn when the app breaks in the
+    // wild instead of waiting for a customer to report it.
+    await FirebaseCrashlytics.instance
+        .setCrashlyticsCollectionEnabled(!kDebugMode);
+    FlutterError.onError =
+        FirebaseCrashlytics.instance.recordFlutterFatalError;
+    PlatformDispatcher.instance.onError = (error, stack) {
+      FirebaseCrashlytics.instance.recordError(error, stack, fatal: true);
+      return true;
+    };
   } catch (e) {
     debugPrint('Firebase init: $e');
   }
