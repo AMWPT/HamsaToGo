@@ -7,9 +7,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart' hide TextDirection;
-import 'package:pdf/pdf.dart' hide TextDirection;
+import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
-import 'package:printing/printing.dart' hide TextDirection;
+import 'package:printing/printing.dart';
 
 import '../../core/theme.dart';
 import '../../models/order.dart';
@@ -120,22 +120,61 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
   }
 
   Future<Uint8List> _buildPdf() async {
-    // Noto Sans Arabic covers Arabic (with proper shaping) but this build has
-    // no Latin/digit glyphs, so English + numbers rendered as tofu when it was
-    // the base font. Fix: use the PDF's built-in Helvetica for Latin + digits
-    // and fall back to Noto only for the Arabic characters it does cover.
+    // Arabic joining only works when the Arabic font is the BASE font: the
+    // pdf package's font-fallback mechanism emits a separate one-character
+    // span for every rune the base font lacks, and its shaper runs per span
+    // — so each Arabic letter is shaped in isolation and renders in its
+    // disconnected form. Hence the base font follows the report language,
+    // and each table cell picks its own font + direction by script, since
+    // customer and item names can be in either language regardless of UI.
     final fontData =
         await rootBundle.load('assets/fonts/NotoSansArabic-Regular.ttf');
     final noto = pw.Font.ttf(fontData);
+    final helvetica = pw.Font.helvetica();
+    final helveticaBold = pw.Font.helveticaBold();
     final isAr = ref.read(localeProvider).languageCode == 'ar';
-    final dateStr = DateFormat('EEEE, d MMMM yyyy').format(_date);
+    // Arabic month/day names in the Arabic report — Latin words would be
+    // scrambled by the RTL per-character fallback described above.
+    final dateStr =
+        DateFormat('EEEE, d MMMM yyyy', isAr ? 'ar' : 'en').format(_date);
 
     final doc = pw.Document();
-    final theme = pw.ThemeData.withFont(
-      base: pw.Font.helvetica(),
-      bold: pw.Font.helveticaBold(),
-      fontFallback: [noto],
-    );
+    final theme = isAr
+        ? pw.ThemeData.withFont(
+            base: noto,
+            bold: noto, // no bold Noto bundled; joined regular beats broken bold
+            fontFallback: [helvetica, helveticaBold],
+          )
+        : pw.ThemeData.withFont(
+            base: helvetica,
+            bold: helveticaBold,
+            fontFallback: [noto],
+          );
+
+    // Script-aware table cell: Arabic text needs the Arabic base font and
+    // RTL flow to join; Latin text needs LTR flow so the page-level RTL
+    // doesn't reverse it.
+    final arabicRe = RegExp(r'[؀-ۿ]');
+    pw.Widget cell(String text, {bool bold = false}) {
+      final ar = arabicRe.hasMatch(text);
+      return pw.Padding(
+        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        child: pw.Directionality(
+          textDirection: ar ? pw.TextDirection.rtl : pw.TextDirection.ltr,
+          child: pw.Text(
+            text,
+            style: pw.TextStyle(
+              fontSize: 10,
+              fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal,
+              font: ar ? noto : helvetica,
+              fontNormal: ar ? noto : helvetica,
+              fontBold: ar ? noto : helveticaBold,
+              fontFallback: ar ? [helvetica, helveticaBold] : [noto],
+            ),
+          ),
+        ),
+      );
+    }
 
     doc.addPage(
       pw.MultiPage(
@@ -184,10 +223,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
               pw.TableRow(
                 decoration: const pw.BoxDecoration(color: PdfColors.green50),
                 children: [
-                  _cell(isAr ? '#' : '#', bold: true),
-                  _cell(isAr ? 'العميل' : 'Customer', bold: true),
-                  _cell(isAr ? 'الأصناف' : 'Items', bold: true),
-                  _cell(isAr ? 'الإجمالي' : 'Total', bold: true),
+                  cell('#', bold: true),
+                  cell(isAr ? 'العميل' : 'Customer', bold: true),
+                  cell(isAr ? 'الأصناف' : 'Items', bold: true),
+                  cell(isAr ? 'الإجمالي' : 'Total', bold: true),
                 ],
               ),
               ..._orders.map((o) {
@@ -196,10 +235,10 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
                         '${it.quantity}× ${it.name(isAr ? 'ar' : 'en')}')
                     .join('\n');
                 return pw.TableRow(children: [
-                  _cell('#${o.displayNumber}'),
-                  _cell(o.customerName.isEmpty ? '-' : o.customerName),
-                  _cell(items),
-                  _cell(o.totalPrice.toStringAsFixed(2)),
+                  cell('#${o.displayNumber}'),
+                  cell(o.customerName.isEmpty ? '-' : o.customerName),
+                  cell(items),
+                  cell(o.totalPrice.toStringAsFixed(2)),
                 ]);
               }),
             ],
@@ -215,14 +254,6 @@ class _ReportsScreenState extends ConsumerState<ReportsScreen> {
     );
     return doc.save();
   }
-
-  pw.Widget _cell(String text, {bool bold = false}) => pw.Padding(
-        padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 5),
-        child: pw.Text(text,
-            style: pw.TextStyle(
-                fontSize: 10,
-                fontWeight: bold ? pw.FontWeight.bold : pw.FontWeight.normal)),
-      );
 
   @override
   Widget build(BuildContext context) {
