@@ -48,10 +48,27 @@ void main() async {
     debugPrint('Firebase init: $e');
   }
 
-  SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  // Phones stay portrait (the customer UI is designed for it). Tablets and
+  // iPads — like the cafe's POS device — may rotate to landscape so they can
+  // run horizontally. A device is treated as a tablet when its shortest side
+  // is at least 600dp (the standard Material breakpoint).
+  final view = WidgetsBinding.instance.platformDispatcher.views.first;
+  final shortestSide =
+      (view.physicalSize / view.devicePixelRatio).shortestSide;
+  final isTablet = shortestSide >= 600;
+  await SystemChrome.setPreferredOrientations(
+    isTablet
+        ? const [
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.portraitDown,
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ]
+        : const [
+            DeviceOrientation.portraitUp,
+            DeviceOrientation.portraitDown,
+          ],
+  );
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
