@@ -38,6 +38,54 @@ abstract class AppRoutes {
   static const legal = '/legal';
 }
 
+/// Screens a signed-out visitor may use.
+///
+/// Browsing the menu, opening an item and filling a cart are deliberately
+/// public: App Store guideline 5.1.1(v) only permits gating features that are
+/// genuinely account-based, so sign-in is demanded at checkout and for order
+/// history — not at the front door.
+bool isPublicRoute(String path) {
+  const public = {
+    AppRoutes.splash,
+    AppRoutes.language,
+    AppRoutes.login,
+    AppRoutes.register,
+    AppRoutes.adminLogin,
+    AppRoutes.legal,
+    AppRoutes.home,
+    AppRoutes.cart,
+  };
+  return public.contains(path) || path.startsWith('/item/');
+}
+
+/// The staff-only area (everything under /admin except the staff login).
+///
+/// Every backing endpoint enforces staff access server-side, so this is not
+/// the security boundary — it just stops anyone who isn't signed in as staff
+/// from rendering the screens at all, whether they're a signed-out visitor or
+/// a signed-in customer who typed the path.
+bool isStaffRoute(String path) =>
+    path.startsWith('/admin') && path != AppRoutes.adminLogin;
+
+/// The login route, carrying the path to come back to once signed in.
+String loginWithReturn(String path) =>
+    '${AppRoutes.login}?from=${Uri.encodeComponent(path)}';
+
+/// Validates a `?from=` value before we navigate to it. Only in-app absolute
+/// paths are allowed: an absolute URL (`https://…`) or a protocol-relative one
+/// (`//host`) is rejected so a crafted link can never bounce a user off-app
+/// after sign-in.
+String? sanitizeReturnTarget(String? from) {
+  if (from == null || from.isEmpty) return null;
+  if (!from.startsWith('/') || from.startsWith('//')) return null;
+  return from;
+}
+
+/// Where to send a user immediately after signing in: back to the screen that
+/// sent them to login, when it's a safe in-app path — otherwise home.
+String? returnTargetOf(GoRouterState state) =>
+    sanitizeReturnTarget(state.uri.queryParameters['from']);
+
 class _AuthRouterNotifier extends ChangeNotifier {
   _AuthRouterNotifier(Ref ref) {
     ref.listen<AuthState>(authProvider, (_, __) => notifyListeners());
@@ -55,12 +103,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoading = authState.isLoading;
       if (isLoading) return null; // let splash handle it
 
-      final isSplash = state.matchedLocation == AppRoutes.splash;
-      final isLanguage = state.matchedLocation == AppRoutes.language;
-      final isAuth = state.matchedLocation == AppRoutes.login ||
-          state.matchedLocation == AppRoutes.register;
-      final isAdminLogin = state.matchedLocation == AppRoutes.adminLogin;
-      final isLegal = state.matchedLocation == AppRoutes.legal;
+      final path = state.matchedLocation;
+      final isSplash = path == AppRoutes.splash;
+      final isLanguage = path == AppRoutes.language;
+      final isAuth = path == AppRoutes.login || path == AppRoutes.register;
+      final isAdminLogin = path == AppRoutes.adminLogin;
+      final isLegal = path == AppRoutes.legal;
 
       if (isLegal) return null; // policies are public, reachable from anywhere
 
@@ -70,14 +118,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         }
       } else if (authState.user != null) {
         if (isAuth || isSplash || isLanguage || isAdminLogin) {
-          return AppRoutes.home;
+          // Signed in from a screen that needed an account — return to it.
+          return returnTargetOf(state) ?? AppRoutes.home;
         }
+        // A customer account is not a staff account — send them back to the
+        // menu rather than rendering the staff area.
+        if (isStaffRoute(path)) return AppRoutes.home;
       } else {
-        // Not authenticated: kick out of any protected route back to login.
-        final isPublic = isSplash || isLanguage || isAuth || isAdminLogin;
-        if (!isPublic) {
-          return AppRoutes.login;
-        }
+        // Signed out: browsing is public (menu, item details, cart).
+        if (isPublicRoute(path)) return null;
+        // The staff area goes to the staff login; account-based customer
+        // screens go to the customer login, remembering where to return.
+        if (isStaffRoute(path)) return AppRoutes.adminLogin;
+        return loginWithReturn(path);
       }
       return null;
     },

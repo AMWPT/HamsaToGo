@@ -59,11 +59,13 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // Cafe settings (e.g. the busy flag) — any signed-in user reads it in
-    // real time so the "we're busy" banner updates live; only the backend
-    // (Admin SDK) writes it, via a staff-only endpoint.
+    // Cafe settings (e.g. the busy flag) — PUBLIC read: browsing the menu
+    // no longer requires an account (App Store guideline 5.1.1(v)), and a
+    // signed-out visitor must still see the "we're busy" banner before they
+    // build a cart. The doc holds a single non-sensitive boolean, and only
+    // the backend (Admin SDK) writes it via a staff-only endpoint.
     match /settings/{doc} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write: if false;
     }
 

@@ -41,8 +41,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     super.dispose();
   }
 
-  // ── Account bottom sheet (sign out + delete account) ─────────
+  // ── Account bottom sheet ─────────────────────────────────────
+  // Signed in: policies, sign out, delete account. Signed out (browsing the
+  // menu without an account): policies plus an invitation to sign in.
   Future<void> _showAccountSheet(bool isAr) async {
+    final signedIn = ref.read(authProvider).user != null;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: HamsaColors.bgSurface,
@@ -85,26 +88,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                     context.push(AppRoutes.legal);
                   },
                 ),
-                const SizedBox(height: 12),
-                _AccountSheetTile(
-                  icon: Icons.logout_rounded,
-                  label: isAr ? 'تسجيل الخروج' : 'Sign out',
-                  color: HamsaColors.cream,
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    await ref.read(authProvider.notifier).logout();
-                  },
-                ),
-                const SizedBox(height: 12),
-                _AccountSheetTile(
-                  icon: Icons.delete_outline_rounded,
-                  label: isAr ? 'حذف الحساب' : 'Delete account',
-                  color: HamsaColors.error,
-                  onTap: () async {
-                    Navigator.of(sheetCtx).pop();
-                    await _confirmDeleteAccount(isAr);
-                  },
-                ),
+                if (signedIn) ...[
+                  const SizedBox(height: 12),
+                  _AccountSheetTile(
+                    icon: Icons.logout_rounded,
+                    label: isAr ? 'تسجيل الخروج' : 'Sign out',
+                    color: HamsaColors.cream,
+                    onTap: () async {
+                      Navigator.of(sheetCtx).pop();
+                      await ref.read(authProvider.notifier).logout();
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  _AccountSheetTile(
+                    icon: Icons.delete_outline_rounded,
+                    label: isAr ? 'حذف الحساب' : 'Delete account',
+                    color: HamsaColors.error,
+                    onTap: () async {
+                      Navigator.of(sheetCtx).pop();
+                      await _confirmDeleteAccount(isAr);
+                    },
+                  ),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  _AccountSheetTile(
+                    icon: Icons.login_rounded,
+                    label: isAr
+                        ? 'تسجيل الدخول / إنشاء حساب'
+                        : 'Sign in or create account',
+                    color: HamsaColors.greenAccent,
+                    onTap: () {
+                      Navigator.of(sheetCtx).pop();
+                      context.go(AppRoutes.login);
+                    },
+                  ),
+                ],
               ],
             ),
           ),
@@ -198,7 +216,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       try {
         await FirebaseAuth.instance.signOut();
       } catch (_) {}
-      return; // auth state cleared → router redirects to login
+      return; // auth state cleared → the menu stays browsable, signed out
     }
 
     if (!mounted) return;
@@ -241,7 +259,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   userName: auth.user?.fullName ?? '',
                   isAr: isAr,
                   topPadding: MediaQuery.of(context).padding.top,
-                  onOrdersTap: () => context.push(AppRoutes.myOrders),
+                  // Order history is account-based: signed-out visitors are
+                  // sent to sign in and returned here afterwards.
+                  onOrdersTap: () => auth.user == null
+                      ? context.go(loginWithReturn(AppRoutes.myOrders))
+                      : context.push(AppRoutes.myOrders),
                   onToggleLocale: () {
                     final next = isAr ? 'en' : 'ar';
                     ref.read(localeProvider.notifier).setLocale(next);

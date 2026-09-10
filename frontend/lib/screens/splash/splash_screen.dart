@@ -59,7 +59,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
     } else if (!hasLanguage) {
       context.go(AppRoutes.language);
     } else {
-      context.go(AppRoutes.login);
+      // Signed-out visitors land on the menu, not the login screen —
+      // browsing doesn't require an account.
+      context.go(AppRoutes.home);
     }
   }
 
