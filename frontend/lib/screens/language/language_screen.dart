@@ -155,7 +155,8 @@ class LanguageScreen extends ConsumerWidget {
 
   void _select(BuildContext context, WidgetRef ref, String lang) {
     ref.read(localeProvider.notifier).setLocale(lang);
-    context.go(AppRoutes.login);
+    // Straight to the menu — first-time visitors browse before signing in.
+    context.go(AppRoutes.home);
   }
 }
 

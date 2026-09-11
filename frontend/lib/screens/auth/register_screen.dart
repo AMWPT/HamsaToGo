@@ -180,6 +180,15 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     ));
   }
 
+  /// The login route, carrying through any pending return target so a user
+  /// who started at checkout still lands back there after signing in.
+  String get _loginRoute {
+    final from = returnTargetOf(GoRouterState.of(context));
+    return from == null
+        ? AppRoutes.login
+        : '${AppRoutes.login}?from=${Uri.encodeComponent(from)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAr = ref.watch(localeProvider).languageCode == 'ar';
@@ -197,7 +206,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             if (_step2) {
               setState(() { _step2 = false; _otpCtrl.clear(); });
             } else {
-              context.go(AppRoutes.login);
+              context.go(_loginRoute);
             }
           },
         ),
@@ -258,7 +267,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   style: HamsaText.body(size: 13, color: HamsaColors.muted),
                 ),
                 GestureDetector(
-                  onTap: () => context.go(AppRoutes.login),
+                  onTap: () => context.go(_loginRoute),
                   child: Text(
                     isAr ? 'تسجيل الدخول' : 'Sign In',
                     style: HamsaText.body(size: 13, color: HamsaColors.greenAccent, weight: FontWeight.w600),

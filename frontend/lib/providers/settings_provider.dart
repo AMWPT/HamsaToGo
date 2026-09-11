@@ -10,13 +10,15 @@ final _fs = FirebaseFirestore.instance;
 ///
 /// Missing doc → `false` (open). On a stream error the AsyncValue is in its
 /// error state; consumers read it as `.valueOrNull ?? false` so a transient
-/// read failure never wrongly blocks ordering. autoDispose + a watch on the
-/// signed-in user so the listener is rebuilt fresh under the current auth
-/// (Firestore rules require a signed-in user).
+/// read failure never wrongly blocks ordering.
+///
+/// The settings doc is publicly readable (see firestore.rules), so signed-out
+/// visitors browsing the menu see the busy banner too — they'd otherwise fill
+/// a cart before discovering ordering is paused. autoDispose + a watch on the
+/// signed-in identity so the listener is rebuilt fresh whenever auth changes.
 final cafeBusyProvider = StreamProvider.autoDispose<bool>((ref) {
-  final userId = ref.watch(authProvider).user?.id;
-  final isAdmin = ref.watch(authProvider).isAdmin;
-  if (userId == null && !isAdmin) return Stream.value(false);
+  ref.watch(authProvider.select((s) => s.user?.id));
+  ref.watch(authProvider.select((s) => s.isAdmin));
 
   return _fs
       .collection('settings')

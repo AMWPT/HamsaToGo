@@ -46,8 +46,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   // ── Step 1: user taps "Pay & Place Order" — start the Moyasar flow ────
   Future<void> _startPayment() async {
     final cart = ref.read(cartProvider);
-    final auth = ref.read(authProvider);
-    if (cart.isEmpty || auth.user == null) return;
+    if (cart.isEmpty) return;
+
+    // Checkout is the account-based step: a signed-out visitor goes to sign
+    // in and comes straight back here. The cart is local state, so it
+    // survives the round trip untouched.
+    if (ref.read(authProvider).user == null) {
+      context.go(loginWithReturn(AppRoutes.cart));
+      return;
+    }
 
     // Belt-and-suspenders: the CTA is already disabled while busy, but never
     // start a payment if the cafe paused ordering.
@@ -536,6 +543,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final locale = ref.watch(localeProvider).languageCode;
     final isAr = locale == 'ar';
     final busy = ref.watch(cafeBusyProvider).valueOrNull ?? false;
+    final signedIn = ref.watch(authProvider).user != null;
 
     return Scaffold(
       backgroundColor: HamsaColors.bgDeep,
@@ -595,6 +603,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   total: total,
                   isAr: isAr,
                   busy: busy,
+                  signedIn: signedIn,
                   isLoading: _isPlacing,
                   selectedMethod: _method,
                   onSelectMethod: (m) => setState(() => _method = m),
@@ -835,6 +844,7 @@ class _OrderSummary extends StatelessWidget {
   final double total;
   final bool isAr;
   final bool busy;
+  final bool signedIn;
   final bool isLoading;
   final PaymentMethod selectedMethod;
   final ValueChanged<PaymentMethod> onSelectMethod;
@@ -846,6 +856,7 @@ class _OrderSummary extends StatelessWidget {
     required this.total,
     required this.isAr,
     required this.busy,
+    required this.signedIn,
     required this.isLoading,
     required this.selectedMethod,
     required this.onSelectMethod,
@@ -929,6 +940,7 @@ class _OrderSummary extends StatelessWidget {
           _PayCta(
             isAr: isAr,
             busy: busy,
+            signedIn: signedIn,
             isLoading: isLoading,
             method: selectedMethod,
             onPlaceOrder: onPlaceOrder,
@@ -948,6 +960,7 @@ class _OrderSummary extends StatelessWidget {
 class _PayCta extends StatelessWidget {
   final bool isAr;
   final bool busy;
+  final bool signedIn;
   final bool isLoading;
   final PaymentMethod method;
   final VoidCallback onPlaceOrder;
@@ -957,6 +970,7 @@ class _PayCta extends StatelessWidget {
   const _PayCta({
     required this.isAr,
     required this.busy,
+    required this.signedIn,
     required this.isLoading,
     required this.method,
     required this.onPlaceOrder,
@@ -982,6 +996,18 @@ class _PayCta extends StatelessWidget {
         onTap: null,
         isLoading: true,
         icon: Icons.lock_outline_rounded,
+      );
+    }
+
+    // Signed-out visitor: placing an order needs an account, so offer sign-in
+    // instead of any payment button. This deliberately also replaces the
+    // native Apple Pay button, which would otherwise start a real charge with
+    // no account to attach the order to.
+    if (!signedIn) {
+      return HamsaButton(
+        label: isAr ? 'سجّل الدخول لإتمام الطلب' : 'Sign in to check out',
+        onTap: onPlaceOrder,
+        icon: Icons.person_outline_rounded,
       );
     }
 

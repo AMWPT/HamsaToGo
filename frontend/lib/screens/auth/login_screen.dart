@@ -75,7 +75,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           action: SnackBarAction(
             label: _isAr ? 'إنشاء حساب' : 'Register',
             textColor: HamsaColors.bgDeep,
-            onPressed: () => context.go(AppRoutes.register),
+            onPressed: () => context.go(_registerRoute),
           ),
         );
         return;
@@ -309,6 +309,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     ));
   }
 
+  /// The register route, carrying through any pending return target so a user
+  /// who started at checkout still lands back there after creating an account.
+  String get _registerRoute {
+    final from = returnTargetOf(GoRouterState.of(context));
+    return from == null
+        ? AppRoutes.register
+        : '${AppRoutes.register}?from=${Uri.encodeComponent(from)}';
+  }
+
+  /// Leaving the login screen without signing in. Login is reachable
+  /// mid-browse now, so it must never be a dead end: go back where the user
+  /// came from when that's a public screen, otherwise to the menu.
+  void _leaveLogin() {
+    final from = returnTargetOf(GoRouterState.of(context));
+    context.go(from != null && isPublicRoute(from) ? from : AppRoutes.home);
+  }
+
   @override
   Widget build(BuildContext context) {
     final isAr = ref.watch(localeProvider).languageCode == 'ar';
@@ -400,7 +417,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                         style: HamsaText.body(size: 13, color: HamsaColors.muted),
                       ),
                       GestureDetector(
-                        onTap: () => context.go(AppRoutes.register),
+                        onTap: () => context.go(_registerRoute),
                         child: Text(
                           isAr ? 'إنشاء حساب' : 'Create one',
                           style: HamsaText.body(size: 13, color: HamsaColors.greenAccent, weight: FontWeight.w600),
@@ -421,6 +438,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
                   const SizedBox(height: 40),
                 ],
+              ),
+            ),
+          ),
+
+          // Back to browsing — kept on the left so it never collides with
+          // the language toggle pinned to the right.
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 12, left: 8),
+              child: Align(
+                alignment: Alignment.topLeft,
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                      color: HamsaColors.cream, size: 20),
+                  onPressed: _leaveLogin,
+                ),
               ),
             ),
           ),
