@@ -41,7 +41,11 @@ abstract class MoyasarConfig {
 
   // Apple Pay only works on iOS once the merchant ID is registered in the
   // Apple Developer account and linked in Moyasar's dashboard.
-  static const applePayMerchantId = 'merchant.com.hamsa.hamsa_flutter';
+  // NOTE: Apple merchant IDs allow only letters/digits/periods/hyphens — no
+  // underscores — so this mirrors the iOS bundle id (com.hamsa.hamsaFlutter).
+  // Must match EXACTLY in Apple Developer, Xcode's Apple Pay capability, and
+  // Moyasar.
+  static const applePayMerchantId = 'merchant.com.hamsa.hamsaFlutter';
 
   static const merchantName = 'Hamsa Coffee Roasters';
 }
