@@ -47,5 +47,10 @@
 		<false/>
 		<key>NSPhotoLibraryUsageDescription</key>
 		<string>Staff can attach a photo from the library to menu items.</string>
+		<!-- App uses only standard/exempt encryption (HTTPS/TLS via the OS),
+		     so it's exempt from export compliance — this skips the App Store
+		     Connect encryption prompt on every upload. -->
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
 	</dict>
 </plist>
