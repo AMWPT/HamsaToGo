@@ -50,7 +50,10 @@ dependencies:
   image_picker: ^1.1.2
 
   # Utilities
-  intl: 0.20.2
+  # Caret (not an exact pin) so it resolves to whatever intl the bundled
+  # flutter_localizations needs — newer Flutter (e.g. Codemagic's stable)
+  # requires intl 0.20.3, which an exact 0.20.2 pin blocked.
+  intl: ^0.20.2
   shimmer: ^3.0.0
 
 dev_dependencies:
