@@ -23,12 +23,12 @@ void main() async {
     // unmodified app — not a bot or a tampered APK. In debug builds this
     // falls back to a debug token you register per-device in the console.
     await FirebaseAppCheck.instance.activate(
-      androidProvider: kDebugMode
-          ? AndroidProvider.debug
-          : AndroidProvider.playIntegrity,
-      appleProvider: kDebugMode
-          ? AppleProvider.debug
-          : AppleProvider.appAttest,
+      providerAndroid: kDebugMode
+          ? const AndroidDebugProvider()
+          : const AndroidPlayIntegrityProvider(),
+      providerApple: kDebugMode
+          ? const AppleDebugProvider()
+          : const AppleAppAttestProvider(),
     );
     await FcmService.initialize(navigatorKey: navigatorKey);
 
@@ -52,10 +52,16 @@ void main() async {
   // iPads — like the cafe's POS device — may rotate to landscape so they can
   // run horizontally. A device is treated as a tablet when its shortest side
   // is at least 600dp (the standard Material breakpoint).
-  final view = WidgetsBinding.instance.platformDispatcher.views.first;
-  final shortestSide =
-      (view.physicalSize / view.devicePixelRatio).shortestSide;
-  final isTablet = shortestSide >= 600;
+  //
+  // Read defensively: this runs before runApp and outside the try/catch above,
+  // so anything thrown here would stop the app from starting at all. Under the
+  // iOS UIScene life cycle the view may not be attached or sized yet at this
+  // point, so a missing view or a zero pixel ratio falls back to phone
+  // behaviour (portrait) rather than throwing.
+  final view = WidgetsBinding.instance.platformDispatcher.implicitView;
+  final isTablet = view != null &&
+      view.devicePixelRatio > 0 &&
+      (view.physicalSize / view.devicePixelRatio).shortestSide >= 600;
   await SystemChrome.setPreferredOrientations(
     isTablet
         ? const [
