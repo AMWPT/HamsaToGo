@@ -22,6 +22,21 @@
 		<string>????</string>
 		<key>CFBundleVersion</key>
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
+		<!-- Firebase phone auth: when a silent push can't verify the app, the
+		     SDK falls back to reCAPTCHA and returns via this URL scheme (the
+		     Encoded App ID of the Firebase iOS app). Without it, that fallback
+		     raises an exception mid-login. -->
+		<key>CFBundleURLTypes</key>
+		<array>
+			<dict>
+				<key>CFBundleTypeRole</key>
+				<string>Editor</string>
+				<key>CFBundleURLSchemes</key>
+				<array>
+					<string>app-1-269284588239-ios-51aaf290028bb655ec15ba</string>
+				</array>
+			</dict>
+		</array>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>UILaunchStoryboardName</key>
