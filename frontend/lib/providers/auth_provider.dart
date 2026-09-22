@@ -50,38 +50,49 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   Future<void> _tryRestoreSession() async {
     try {
-      // Wait for Firebase to restore any persisted session before making
-      // authenticated calls — currentUser is null briefly on cold start, and
-      // the backend now requires a valid ID token on protected endpoints.
-      final fbUser = FirebaseAuth.instance.currentUser ??
-          await FirebaseAuth.instance
-              .authStateChanges()
-              .first
-              .timeout(const Duration(seconds: 5), onTimeout: () => null);
-
       final isAdmin = await _storage.read(key: StorageKeys.isAdmin);
-      if (isAdmin == 'true') {
-        // Staff access is enforced by Firestore rules (the /staff/{uid} doc);
-        // just confirm a live Firebase session still backs it.
-        if (fbUser != null) {
-          state = const AuthState(isAdmin: true);
-          // Re-register the device for new-order alerts (tokens rotate).
-          FcmService.registerStaffToken(_api);
-          return;
-        }
-        await _storage.deleteAll();
+      final userId = await _storage.read(key: StorageKeys.userId);
+
+      // Nothing stored → not logged in; don't wait on Firebase at all (so a
+      // fresh/logged-out user hits the login screen with no delay).
+      if (isAdmin != 'true' && userId == null) {
         state = const AuthState();
         return;
       }
 
-      final userId = await _storage.read(key: StorageKeys.userId);
+      // We have a stored session. On cold start Firebase restores its saved
+      // session from disk asynchronously: currentUser is null until it
+      // finishes, and the FIRST authStateChanges event can be a momentary
+      // null before the session loads. Wait for the actual restored user (not
+      // that first event), so a slow device — e.g. the cafe tablet — isn't
+      // wrongly treated as logged out.
+      User? fbUser = FirebaseAuth.instance.currentUser;
+      if (fbUser == null) {
+        try {
+          fbUser = await FirebaseAuth.instance
+              .authStateChanges()
+              .firstWhere((u) => u != null)
+              .timeout(const Duration(seconds: 8));
+        } catch (_) {
+          fbUser = FirebaseAuth.instance.currentUser; // genuinely signed out
+        }
+      }
+
+      if (isAdmin == 'true' && fbUser != null) {
+        state = const AuthState(isAdmin: true);
+        // Re-register the device for new-order alerts (tokens rotate).
+        FcmService.registerStaffToken(_api);
+        return;
+      }
       if (userId != null && fbUser != null) {
         final user = await _api.getUser(userId);
         state = AuthState(user: user);
         return;
       }
-      // Stored session but no live Firebase user → clean it up.
-      if (userId != null) await _storage.deleteAll();
+      // Stored session but Firebase couldn't restore a user: fall through to
+      // the logged-out state below WITHOUT wiping storage — a null here is
+      // often just a restore that didn't finish, and the next launch can
+      // recover. A real sign-out (logout()/deleteAccount()) still clears it.
     } catch (_) {}
     state = const AuthState();
   }

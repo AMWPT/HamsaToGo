@@ -1,4 +1,5 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -76,6 +77,16 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         await _signInWithCredential(credential);
       },
       verificationFailed: (FirebaseAuthException e) {
+        // Record the real Firebase code/message so OTP-send failures that fall
+        // through to the generic message (e.g. iOS app-verification failures)
+        // can be diagnosed. Non-fatal — never disrupts the flow.
+        FirebaseCrashlytics.instance.recordError(
+          e,
+          null,
+          reason: 'verifyPhoneNumber failed (register): ${e.code}',
+          information: ['code=${e.code}', 'message=${e.message}'],
+          fatal: false,
+        );
         setState(() => _sending = false);
         _showError(friendlyAuthError(
           e,
