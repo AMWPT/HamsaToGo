@@ -39,6 +39,12 @@
 		</array>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
+		<!-- Remote notifications background mode: required so Firebase Auth can
+		     receive its silent phone-verification push (and for FCM data). -->
+		<key>UIBackgroundModes</key>
+		<array>
+			<string>remote-notification</string>
+		</array>
 		<key>UILaunchStoryboardName</key>
 		<string>LaunchScreen</string>
 		<key>UIMainStoryboardFile</key>
