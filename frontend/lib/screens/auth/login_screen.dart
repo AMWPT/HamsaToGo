@@ -109,12 +109,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           fatal: false,
         );
         setState(() => _sending = false);
-        _showError(friendlyAuthError(
-          e,
-          isAr: _isAr,
-          fallbackEn: 'Could not send the code. Please try again.',
-          fallbackAr: 'تعذّر إرسال الرمز. حاول مرة أخرى.',
-        ));
+        // TEMP DEBUG: surface the raw Firebase code on screen (see register).
+        _showError(
+          '${friendlyAuthError(
+            e,
+            isAr: _isAr,
+            fallbackEn: 'Could not send the code. Please try again.',
+            fallbackAr: 'تعذّر إرسال الرمز. حاول مرة أخرى.',
+          )}\n[debug: ${e.code}]',
+        );
       },
       codeSent: (String verificationId, int? resendToken) {
         setState(() {
