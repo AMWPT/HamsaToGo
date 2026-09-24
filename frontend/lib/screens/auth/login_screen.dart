@@ -116,7 +116,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             isAr: _isAr,
             fallbackEn: 'Could not send the code. Please try again.',
             fallbackAr: 'تعذّر إرسال الرمز. حاول مرة أخرى.',
-          )}\n[debug: ${e.code}]',
+          )}\n[debug: ${e.code}]\nmsg: ${e.message}',
         );
       },
       codeSent: (String verificationId, int? resendToken) {
